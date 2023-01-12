@@ -1,1 +1,3 @@
-hw1/bin/*
+*/bin/*
+.DS_Store
+.vscode/*

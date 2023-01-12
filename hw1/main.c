@@ -10,10 +10,15 @@
 #include <arpa/inet.h>
 #include <sys/wait.h>
 #include <signal.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <time.h>
+
 
 #define PORT "8080"  // the port users will be connecting to
-
 #define BACKLOG 10   // how many pending connections queue will hold
+#define VIDEODIR "./content/video"  //the directory where video files are stored
+#define ROUTE "/video" // the URL route for video playback
 
 void sigchld_handler(int s) {
     // waitpid() might overwrite errno, so we save and restore it:
@@ -101,13 +106,7 @@ int main(void) {
             get_in_addr((struct sockaddr *)&their_addr),
             s, sizeof s);
         printf("server: got connection from %s\n", s);
-        // if (!fork()) { // this is the child process
-        //     close(sockfd); // child doesn't need the listener
-        //     if (send(new_fd, "Hello, world!", 13, 0) == -1)
-        //         perror("send");
-        //     close(new_fd);
-        //     exit(0);
-        // }
+
         if (!fork()) { // this is the child process
             close(sockfd); // child doesn't need the listener
             char buffer[1024];
@@ -118,6 +117,38 @@ int main(void) {
                 char* message = "HTTP/1.1 200 OK\r\n"
                                 "Content-Type: text/html; charset=UTF-8\r\n\r\n"
                                 "<html><body>Hello World!</body></html>\r\n";
+                send(new_fd, message, strlen(message), 0);
+            }
+            else if(strstr(buffer, "GET " ROUTE " HTTP/1.1")) {
+                char* videofile = VIDEODIR "/video.webm";
+                int fd = open(videofile, O_RDONLY);
+                if (fd == -1) {
+                    perror("Error opening video file");
+                    close(new_fd);
+                    exit(1);
+                }
+                off_t file_size = lseek(fd, 0, SEEK_END);
+                lseek(fd, 0, SEEK_SET);
+                char headers[1000];
+                char last_modified[100];
+                struct tm timeinfo;
+                struct stat stat_buf;
+                fstat(fd, &stat_buf);
+                localtime_r(&stat_buf.st_mtime, &timeinfo);
+                strftime(last_modified, sizeof last_modified, "%a, %d %b %Y %H:%M:%S %Z", &timeinfo);
+                sprintf(headers, "HTTP/1.1 200 OK\r\nContent-Type: video/webm\r\nContent-Length: %ld\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", file_size, last_modified);
+                send(new_fd, headers, strlen(headers), 0);
+                char buffer[4096];
+                ssize_t bytes_read;
+                while ((bytes_read = read(fd, buffer, sizeof buffer)) > 0) {
+                    send(new_fd, buffer, bytes_read, 0);
+                }
+                close(fd);
+            }
+            else {
+                char* message = "HTTP/1.1 404 Not Found\r\n"
+                                "Content-Type: text/html; charset=UTF-8\r\n\r\n"
+                                "<html><body>404 Not Found</body></html>\r\n";
                 send(new_fd, message, strlen(message), 0);
             }
             close(new_fd);

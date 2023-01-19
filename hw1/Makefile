@@ -1,3 +1,14 @@
-myserver: main.c
-	mkdir -p bin
-	gcc -o bin/myserver main.c
+ifndef port
+port = 8345
+endif
+
+all: vodserver
+
+vodserver: src/main.c
+	gcc -o vodserver src/main.c
+
+run: vodserver
+	./vodserver $(port)
+
+clean:
+	rm -f vodserver

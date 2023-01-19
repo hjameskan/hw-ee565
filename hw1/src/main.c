@@ -15,7 +15,6 @@
 #include <time.h>
 #include <ctype.h>
 
-#define PORT "8345"  // the port users will be connecting to
 #define BACKLOG 10   // how many pending connections queue will hold
 #define VIDEODIR "./content/video"  //the directory where video files are stored
 #define ROUTE "/video" // the URL route for video playback

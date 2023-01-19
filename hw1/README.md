@@ -1,6 +1,6 @@
 # Instruction to Start Server
 
-First time running: go to the directory: `hw1`, execute:
+First time running: go to the directory: `hw1`, execute one of the follwoing:
 
 ```
 make

@@ -127,6 +127,36 @@ int main(int argc, char *argv[]) {
             int numbytes;
             numbytes = recv(new_fd, buffer, sizeof buffer, 0);
             buffer[numbytes] = '\0';
+            char *method, *path, *version;
+
+            // using strtok to tokenize the request
+            char *path_part;
+            int count = 0;
+
+            method = strtok(buffer, " ");
+            path = strtok(NULL, " ");
+            version = strtok(NULL, " ");
+
+            // using strtok to tokenize the path
+            // path_part = strtok(path, "/");
+            // while (path_part != NULL) {
+            //     count++;
+            //     path_part = strtok(NULL, "/");
+            //     printf("Path part: %s", path_part);
+            // }
+
+            // if (count == 2) {
+            //     // reset the pointer
+            //     path_part = strtok(path, "/");
+            //     char *type = path_part;
+            //     path_part = strtok(NULL, "/");
+            //     char *filename = path_part;
+            //     printf("Type: %s\nFilename: %s\n", type, filename);
+            // }
+            // else {
+            //     printf("Invalid path format\n");
+            // }
+
             if(strstr(buffer, "GET / HTTP/1.1")) {
                 char* message = "HTTP/1.1 200 OK\r\n"
                                 "Content-Type: text/html; charset=UTF-8\r\n\r\n"

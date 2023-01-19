@@ -16,6 +16,6 @@ make run [port] # defaults to 8345 if empty
 Then, navigate to:
 
 ```
-http://localhost:8080/          # will display hello world
-http://localhost:8080/video     # will play a webm video
+http://localhost:8345/          # will display hello world
+http://localhost:8345/video/video.webm     # will play a webm video
 ```

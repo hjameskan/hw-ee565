@@ -14,6 +14,7 @@
 #include <fcntl.h>
 #include <time.h>
 #include <ctype.h>
+#include <string.h>
 
 #define BACKLOG 10   // how many pending connections queue will hold
 #define VIDEODIR "./content/video"  //the directory where video files are stored
@@ -127,45 +128,54 @@ int main(int argc, char *argv[]) {
             int numbytes;
             numbytes = recv(new_fd, buffer, sizeof buffer, 0);
             buffer[numbytes] = '\0';
+
+            // parsing url paths
             char *method, *path, *version;
+            char request[sizeof buffer];
+            strcpy(request, buffer);
+            char *type;
+            char *filename;
 
             // using strtok to tokenize the request
             char *path_part;
             int count = 0;
-
-            method = strtok(buffer, " ");
+            method = strtok(request, " ");
             path = strtok(NULL, " ");
+            char pathstr[strlen(path) + 1];
+            char pathstr2[strlen(path) + 1];
+            strcpy(pathstr, path);
+            strcpy(pathstr2, path);
             version = strtok(NULL, " ");
 
             // using strtok to tokenize the path
-            // path_part = strtok(path, "/");
-            // while (path_part != NULL) {
-            //     count++;
-            //     path_part = strtok(NULL, "/");
-            //     printf("Path part: %s", path_part);
-            // }
+            path_part = strtok(path, "/");
+            while (path_part != NULL) {
+                path_part = strtok(NULL, "/");
+                count++;
+            }
 
-            // if (count == 2) {
-            //     // reset the pointer
-            //     path_part = strtok(path, "/");
-            //     char *type = path_part;
-            //     path_part = strtok(NULL, "/");
-            //     char *filename = path_part;
-            //     printf("Type: %s\nFilename: %s\n", type, filename);
-            // }
-            // else {
-            //     printf("Invalid path format\n");
-            // }
+            if (count == 2) {
+                // reset the pointer
+                path_part = strtok(pathstr2, "/");
+                type = path_part;
+                path_part = strtok(NULL, "/");
+                filename = path_part;
+            }
 
-            if(strstr(buffer, "GET / HTTP/1.1")) {
+            if(strcmp(pathstr, "/") == 0) {
                 char* message = "HTTP/1.1 200 OK\r\n"
                                 "Content-Type: text/html; charset=UTF-8\r\n\r\n"
                                 "<html><body>Hello World!</body></html>\r\n";
                 send(new_fd, message, strlen(message), 0);
             }
-            else if (strstr(buffer, "GET " ROUTE " HTTP/1.1")) {
-                char * videofile = VIDEODIR "/video.webm";
-                int fd = open(videofile, O_RDONLY);
+            else if (count == 2 && strcmp(type, "video") == 0) {
+                char * videofile = VIDEODIR "/";    // video directory
+                // get file location, including the filename
+                char filelocation[100] = VIDEODIR "/";
+                strcat(filelocation, filename);
+
+                // open the file
+                int fd = open(filelocation, O_RDONLY);
                 if (fd == -1) {
                     perror("Error opening video file");
                     close(new_fd);

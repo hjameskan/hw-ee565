@@ -1,11 +1,12 @@
 # Instruction to Start Server
 
-First time running: go to the directory: `hw1`, execute one of the follwoing:
+Go to the directory: `hw1`, execute one of the follwoing:
 
 ```
 make
 vodserver [port] # defaults to 8345 if empty
 ```
+
 
 ```
 make clean

@@ -275,7 +275,7 @@ int main(int argc, char *argv[]) {
                 close(fd);
             }
             else {
-            //////////////////////////////////check file types added start//////////////////////////////////////////
+                // Check the file extension of the requested resource
                 char* ext = strrchr(req_path, '.');
                 char content_type[1024] = {0};
                 if (strcmp(ext, ".txt") == 0) {
@@ -305,6 +305,8 @@ int main(int argc, char *argv[]) {
                 else {
                     strcpy(content_type, "application/octet-stream");
                 }
+
+                // Requested resource path
                 char* file_path = req_path + 1;
                 if (access(file_path, F_OK) != -1) {
                     int file_fd = open(file_path, O_RDONLY);
@@ -329,7 +331,7 @@ int main(int argc, char *argv[]) {
                     int bytes_sent = 0;
                     while (bytes_sent < file_size) {
                         int bytes_read = read(file_fd, buffer, sizeof(buffer));
-                        if (bytes_read <= 0)
+                        if (bytes_read <= 0) {
                             break;
                         }
                         if (write(new_fd, buffer, bytes_read) < 0) {
@@ -338,17 +340,15 @@ int main(int argc, char *argv[]) {
                         }
                         bytes_sent += bytes_read;
                     }
-
                     close(file_fd);
-                }
-                else {
-             //////////////////////////////////check file types end//////////////////////////////////////////
+                } else {
                     char response[1024] = {0};
                     sprintf(response, "HTTP/1.1 404 Not Found\r\n\r\n");
                     if (write(new_fd, response, strlen(response)) < 0) {
                         perror("Error writing to socket");
                     }
                 }
+            }
             close(new_fd);
             exit(0);
         }

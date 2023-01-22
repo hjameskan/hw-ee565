@@ -267,6 +267,7 @@ int main(int argc, char *argv[]) {
                 }
                 close(fd);
             }
+<<<<<<< HEAD
             else if (count == 2 && strcmp(type, "image") == 0) {
                 char * videofile = "./content/image" "/";    // image directory
                 // get file location, including the filename
@@ -279,6 +280,35 @@ int main(int argc, char *argv[]) {
                     perror("Error opening image file");
                     close(new_fd);
                     exit(1);
+=======
+            else {
+                // Check the file extension of the requested resource
+                char* ext = strrchr(req_path, '.');
+                char content_type[1024] = {0};
+                if (strcmp(ext, ".txt") == 0) {
+                    strcpy(content_type, "text/plain");
+                }
+                else if (strcmp(ext, ".css") == 0) {
+                    strcpy(content_type, "text/css");
+                }
+                else if (strcmp(ext, ".htm") == 0 || strcmp(ext, ".html") == 0) {
+                    strcpy(content_type, "text/html");
+                }
+                else if (strcmp(ext, ".gif") == 0) {
+                    strcpy(content_type, "image/gif");
+                }
+                else if (strcmp(ext, ".jpg") == 0 || strcmp(ext, ".jpeg") == 0) {
+                    strcpy(content_type, "image/jpeg");
+                }
+                else if (strcmp(ext, ".png") == 0) {
+                    strcpy(content_type, "image/png");
+                }
+                else if (strcmp(ext, ".js") == 0) {
+                    strcpy(content_type, "application/javascript");
+                }
+                else if (strcmp(ext, ".mp4") == 0 || strcmp(ext, ".webm") == 0 || strcmp(ext, ".ogg") == 0) {
+                    strcpy(content_type, "video/webm");
+>>>>>>> Update main.c
                 }
                 off_t file_size = lseek(fd, 0, SEEK_END);
                 lseek(fd, 0, SEEK_SET);
@@ -297,6 +327,7 @@ int main(int argc, char *argv[]) {
                 while ((bytes_read = read(fd, buffer, sizeof buffer)) > 0) {
                     send(new_fd, buffer, bytes_read, 0);
                 }
+<<<<<<< HEAD
             }
             else if (count == 2 && strcmp(type, "text") == 0) {
                 char * videofile = "./content/text" "/";    // image directory
@@ -335,6 +366,52 @@ int main(int argc, char *argv[]) {
                                 "<html><body>404 Not Found</body></html>\r\n";
                 send(new_fd, message, strlen(message), 0);
             }
+=======
+
+                // Requested resource path
+                char* file_path = req_path + 1;
+                if (access(file_path, F_OK) != -1) {
+                    int file_fd = open(file_path, O_RDONLY);
+                    if (file_fd == -1) {
+                        perror("Error opening file");
+                        close(new_fd);
+                        continue;
+                    }
+
+                    struct stat st;
+                    fstat(file_fd, &st);
+                    int file_size = st.st_size;
+
+                    char response[1024] = {0};
+                    sprintf(response, "HTTP/1.1 200 OK\r\nContent-Length: %d\r\nContent-Type: %s\r\n\r\n", file_size, content_type);
+                    if (write(new_fd, response, strlen(response)) < 0) {
+                        perror("Error writing to socket");
+                        close(new_fd);
+                        continue;
+                    }
+
+                    int bytes_sent = 0;
+                    while (bytes_sent < file_size) {
+                        int bytes_read = read(file_fd, buffer, sizeof(buffer));
+                        if (bytes_read <= 0) {
+                            break;
+                        }
+                        if (write(new_fd, buffer, bytes_read) < 0) {
+                            perror("Error writing to socket");
+                            break;
+                        }
+                        bytes_sent += bytes_read;
+                    }
+                    close(file_fd);
+                } else {
+                    char response[1024] = {0};
+                    sprintf(response, "HTTP/1.1 404 Not Found\r\n\r\n");
+                    if (write(new_fd, response, strlen(response)) < 0) {
+                        perror("Error writing to socket");
+                    }
+                }
+            }
+>>>>>>> Update main.c
             close(new_fd);
             exit(0);
         }

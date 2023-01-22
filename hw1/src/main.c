@@ -346,6 +346,7 @@ void sigchld_handler(int s) {
     errno = saved_errno;
 }
 
+// Helper function to get the internet address of a socket address
 void *get_in_addr(struct sockaddr *sa) {
     if (sa->sa_family == AF_INET) {
         return &(((struct sockaddr_in*)sa)->sin_addr);
@@ -354,13 +355,15 @@ void *get_in_addr(struct sockaddr *sa) {
 }
 
 int main(int argc, char *argv[]) {
+    // Ensure that a port number is provided as a command line argument
     if (argc < 2) {
         printf("Usage: %s [port]\n", argv[0]);
         return 1;
     }
 
+    // Convert the port number from a string to an int
     char *port = argv[1];
-
+    // Check that the port number is a valid value
     int port_int = atoi(port);
     if(port_int < 0 || port_int > 65535){
         printf("Invalid port: %s\n", argv[1]);
@@ -383,6 +386,7 @@ int main(int argc, char *argv[]) {
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
 
+    // Get the address information for the server
     if ((rv = getaddrinfo(NULL, port, &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         return 1;
@@ -390,36 +394,40 @@ int main(int argc, char *argv[]) {
 
      // loop through all the results and bind to the first we can
     for(p = servinfo; p != NULL; p = p->ai_next) {
+        // Create a socket for the current address
         if ((sockfd = socket(p->ai_family, p->ai_socktype,
                 p->ai_protocol)) == -1) {
             perror("Server: socket");
             continue;
         }
+        // Set the socket options to allow address reuse
         if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
                 sizeof(int)) == -1) {
             perror("setsockopt");
             exit(1);
         }
+        // Bind the socket to the current address
         if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
             close(sockfd);
             perror("Server: bind");
             continue;
         }
-
+        // If we reach this point, the address has been successfully bound
         break;
     }
-
+    // Check if we were able to bind to any address
     if (p == NULL)  {
         fprintf(stderr, "Server: failed to bind\n");
         return 2;
     }
 
     freeaddrinfo(servinfo); // all done with this structure
-
+    // Listen for incoming connections on the socket
     if (listen(sockfd, BACKLOG) == -1) {
         perror("listen");
         exit(1);
     }
+    // Set the signal handler for child process termination
     sa.sa_handler = sigchld_handler; // reap all dead processes
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART;
@@ -429,6 +437,7 @@ int main(int argc, char *argv[]) {
     }
     printf("Server: waiting for connections...\n");
 
+    // Main loop to accept and handle incoming connections
     while(1) {  // main accept() loop
         sin_size = sizeof their_addr;
         new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);

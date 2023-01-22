@@ -5,7 +5,7 @@ endif
 all: vodserver
 
 vodserver: src/main.c
-	gcc -o vodserver src/main.c
+	gcc -Wall -o vodserver src/main.c
 
 run: vodserver
 	./vodserver $(port)

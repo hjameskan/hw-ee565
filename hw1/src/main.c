@@ -280,7 +280,7 @@ int main(int argc, char *argv[]) {
                 fstat(fd, & stat_buf);
                 localtime_r( & stat_buf.st_mtime, & timeinfo);
                 strftime(last_modified, sizeof last_modified, "%a, %d %b %Y %H:%M:%S %Z", & timeinfo);
-
+            
                 sprintf(headers, "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: %ld\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", file_size, last_modified);
                 send(new_fd, headers, strlen(headers), 0);
                 char buffer[4096];
@@ -288,12 +288,8 @@ int main(int argc, char *argv[]) {
                 while ((bytes_read = read(fd, buffer, sizeof buffer)) > 0) {
                     send(new_fd, buffer, bytes_read, 0);
                 }
-                close(new_fd);
-
             }
             else {
-
-
                 char* message = "HTTP/1.1 404 Not Found\r\n"
                                 "Content-Type: text/html; charset=UTF-8\r\n\r\n"
                                 "<html><body>404 Not Found</body></html>\r\n";

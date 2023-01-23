@@ -16,7 +16,7 @@
 #include <ctype.h>
 #include <string.h>
 
-#define BACKLOG 50   // how many pending connections queue will hold
+#define BACKLOG 100   // how many pending connections queue will hold
 #define VIDEODIR "./content/video"  //the directory where video files are stored
 #define ROUTE "/video" // the URL route for video playback
 
@@ -447,7 +447,7 @@ int main(int argc, char *argv[]) {
 
                 // open the file
                 //if (is_video_transfer){
-                    transfer_file_chunk(buffer, file_location, new_fd, content_type);
+                transfer_file_chunk(buffer, file_location, new_fd, content_type);
                 //} else {
                 //    transfer_standard_file(file_location, new_fd, content_type);
                 //}

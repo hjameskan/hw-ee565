@@ -39,6 +39,12 @@ void *get_in_addr(struct sockaddr *sa) {
 
 // HTTP Processing functions
 
+void generate_timestamp(char *buf) {
+    time_t now = time(0);
+    struct tm tm = *gmtime(&now);
+    strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S %Z", &tm);
+}
+
 void process_startline(char *request, char **method, char **path, char **version) {
     *method  = strtok(request, " ");
     *path    = strtok(NULL, " ");
@@ -79,6 +85,7 @@ void transfer_file_chunk(char *og_req_buffer, char *file_path, int socket_fd,
     // open the file
     int fd = open(file_path, O_RDONLY);
     if (fd == -1) {
+        // TODO: insert 500 http response here?
         perror("Error opening video file");
         close(socket_fd);
         exit(1);
@@ -93,6 +100,9 @@ void transfer_file_chunk(char *og_req_buffer, char *file_path, int socket_fd,
     fstat(fd, & stat_buf);
     localtime_r( & stat_buf.st_mtime, & timeinfo);
     strftime(last_modified, sizeof(last_modified), "%a, %d %b %Y %H:%M:%S %Z", & timeinfo);
+
+    char date_timestamp[200];
+    generate_timestamp(date_timestamp);
 
     // check for the Range field in the headers
     if (strstr(og_req_buffer, "Range:")) {
@@ -123,15 +133,17 @@ void transfer_file_chunk(char *og_req_buffer, char *file_path, int socket_fd,
                 sprintf(headers, "HTTP/1.1 206 Partial Content\r\n"
                                 "Content-Range: bytes 0-%ld/%ld\r\n"
                                 "Content-Type: %s\r\nLast-Modified: %s\r\n"
+                                "Date: %s\r\n"
                                 "Connection: Keep-Alive\r\n\r\n",
-                                range_end, file_size, content_type, last_modified);
+                                range_end, file_size, content_type, last_modified, date_timestamp);
             } else {
                 // send "206 Partial Content" response with appropriate Content-Range header
                 sprintf(headers, "HTTP/1.1 206 Partial Content\r\n"
                              "Content-Range: bytes %ld-%ld/%ld\r\n"
                              "Content-Type: %s\r\nLast-Modified: %s\r\n"
+                             "Date: %s\r\n"
                              "Connection: Keep-Alive\r\n\r\n",
-                             range_start, range_end, file_size, content_type, last_modified);
+                             range_start, range_end, file_size, content_type, last_modified, date_timestamp);
             }
 
             send(socket_fd, headers, strlen(headers), 0);
@@ -158,15 +170,17 @@ void transfer_file_chunk(char *og_req_buffer, char *file_path, int socket_fd,
             sprintf(headers, "HTTP/1.1 416 Range Not Satisfiable\r\n"
             "Content-Range: bytes */%ld\r\n"
             "Content-Type: text/html; charset=UTF-8\r\n\r\n"
-            "<html><body>416 Range Not Satisfiable</body></html>\r\n", file_size);
+            "Date: %s\r\n"
+            "<html><body>416 Range Not Satisfiable</body></html>\r\n", file_size, date_timestamp);
             send(socket_fd, headers, strlen(headers), 0);
         }
     } else {
         // send "200 OK" response if no range is specified
         sprintf(headers, "HTTP/1.1 200 OK\r\nContent-Type: %s\r\n"
                         "Content-Length: %ld\r\nLast-Modified: %s\r\n"
+                        "Date: %s\r\n"
                         "Connection: Keep-Alive\r\n\r\n",
-                        content_type, file_size, last_modified);
+                        content_type, file_size, last_modified, date_timestamp);
 
         send(socket_fd, headers, strlen(headers), 0);
 

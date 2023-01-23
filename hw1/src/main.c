@@ -72,6 +72,188 @@ void parse_http_uri(const char *path, char **filename, char **filetype) {
     printf("[INFO]: filename: %s, filetype: %s\n", *filename, *filetype);
 }
 
+void transfer_video_file(char *og_req_buffer, char *file_path, int socket_fd, char *content_type) {
+    // seperate http response file tranfer routine for video-type files
+
+
+    // open the file
+    int fd = open(file_path, O_RDONLY);
+    if (fd == -1) {
+        perror("Error opening video file");
+        close(socket_fd);
+        exit(1);
+    }
+
+    off_t file_size = lseek(fd, 0, SEEK_END);
+    lseek(fd, 0, SEEK_SET);
+    char headers[1000];
+    char last_modified[100];
+    struct tm timeinfo;
+    struct stat stat_buf;
+    fstat(fd, & stat_buf);
+    localtime_r( & stat_buf.st_mtime, & timeinfo);
+    strftime(last_modified, sizeof(last_modified), "%a, %d %b %Y %H:%M:%S %Z", & timeinfo);
+
+    // check for the Range field in the headers
+    if (strstr(og_req_buffer, "Range:")) {
+        char * range_start, *range_end;
+        // extract the range values from the headers
+        char *range_header = strstr(og_req_buffer, "Range:");
+        // sscanf(buffer, "Range: bytes=%ld-%ld", & range_start, & range_end);
+        char *range_start_str, *range_end_str;
+
+        range_start_str = strchr(range_header, '=') + 1;
+        range_end_str = strchr(range_start_str, '-');
+        if (range_end_str && isdigit((unsigned char)*(range_end_str+1))) {
+            *range_end_str = '\0'; // replace '-' with null character
+            range_start = strtol(range_start_str, NULL, 10);
+            range_end = strtol(range_end_str + 1, NULL, 10);
+        } else {
+            range_start = strtol(range_start_str, NULL, 10);
+            range_end = file_size - 1;
+        }
+        // check if range starts from 0
+        if (range_start == 0) {
+            if (range_end >= file_size) {
+                range_end = file_size - 1; // adjust end range to the end of the file
+            }
+            // send "206 Partial Content" response with appropriate Content-Range header
+            sprintf(headers, "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 0-%ld/%ld\r\nContent-Type: video/webm\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", range_end, file_size, last_modified);
+            send(socket_fd, headers, strlen(headers), 0);
+            // send the requested range of bytes
+            lseek(fd, range_start, SEEK_SET);
+            char buffer[4096];
+            ssize_t bytes_read;
+            while ((bytes_read = read(fd, buffer, sizeof(buffer))) > 0) {
+                send(socket_fd, buffer, bytes_read, 0);
+            }
+        } else if (range_start < file_size) {
+            if (range_end >= file_size) {
+                range_end = file_size - 1; // adjust end range to the end of the file
+            }
+            // send "206 Partial Content" response with appropriate Content-Range header
+            sprintf(headers, "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes %ld-%ld/%ld\r\n"
+                             "Content-Type: video/webm\r\nLast-Modified: %s\r\n"
+                             "Connection: Keep-Alive\r\n\r\n", range_start, range_end, file_size, last_modified);
+            send(socket_fd, headers, strlen(headers), 0);
+            // send the requested range of bytes
+            lseek(fd, range_start, SEEK_SET);
+            char buffer[4096];
+            ssize_t bytes_read;
+            while ((bytes_read = read(fd, buffer, sizeof(buffer))) > 0) {
+                send(socket_fd, buffer, bytes_read, 0);
+            }
+        } else {
+            // send "416 Range Not Satisfiable" response if range is not valid
+            char * message = "HTTP/1.1 416 Range Not Satisfiable\r\n"
+            "Content-Range: bytes */%ld\r\n"
+            "Content-Type: text/html; charset=UTF-8\r\n\r\n"
+            "<html><body>416 Range Not Satisfiable</body></html>\r\n", file_size;
+            send(socket_fd, message, strlen(message), 0);
+        }
+    } else {
+        // send "200 OK" response if no range is specified
+        sprintf(headers, "HTTP/1.1 200 OK\r\nContent-Type: video/webm\r\nContent-Length: %ld\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", file_size, last_modified);
+        send(socket_fd, headers, strlen(headers), 0);
+        char buffer[4096];
+        ssize_t bytes_read;
+        while ((bytes_read = read(fd, buffer, sizeof(buffer))) > 0) {
+            send(socket_fd, buffer, bytes_read, 0);
+        }
+    }
+
+    close(fd);
+}
+
+
+void transfer_standard_file(char *file_path, int socket_fd, char *content_type) {
+    // transfers an entire file located at file_path through the socket
+    // at socket_fd in a single http response.
+    //
+    // the http's Content-Type header field is parameterised by 'content_type'
+    // string
+
+
+    int fd = open(file_path, O_RDONLY);
+
+    if (fd == -1) {
+
+        perror("Error opening text file");
+
+        char* message = "HTTP/1.1 404 Not Found\r\n" // TODO: maybe this should be a different error message
+                        "Content-Type: text/html; charset=UTF-8\r\n\r\n"
+                        "<html><body>404 Not Found</body></html>\r\n";
+
+        send(socket_fd, message, strlen(message), 0);
+        close(socket_fd);
+        exit(1);
+    }
+
+    off_t file_size = lseek(fd, 0, SEEK_END);
+    lseek(fd, 0, SEEK_SET);
+
+    char headers[1000];
+    char last_modified[100];
+    char buffer[4096];
+
+    struct tm timeinfo;
+    struct stat stat_buf;
+
+    fstat(fd, &stat_buf);
+    localtime_r(&stat_buf.st_mtime, &timeinfo);
+    strftime(last_modified, sizeof last_modified, "%a, %d %b %Y %H:%M:%S %Z", & timeinfo);
+
+    sprintf(headers, "HTTP/1.1 200 OK\r\nContent-Type: %s\r\n"
+                     "Content-Length: %ld\r\nLast-Modified: %s\r\n"
+                     "Connection: Keep-Alive\r\n\r\n", content_type, file_size, last_modified);
+
+    send(socket_fd, headers, strlen(headers), 0);
+
+    ssize_t bytes_read;
+    while ((bytes_read = read(fd, buffer, sizeof buffer)) > 0) {
+        send(socket_fd, buffer, bytes_read, 0);
+    }
+}
+
+
+
+int content_type_lookup(char *content_type, char *filetype) {
+    // input:
+    // -    content_type - a pointer to a destination buffer on the stack
+    // to be filled with a content-type string
+    //
+    // -    filetype - a file's file extension type. if NULL (for an empty string)
+    // then the associated content-type is 'application/octet-stream', otherwise
+    // directly pattern matches the extension for a content-type.
+    //
+    // output:
+    // - content_type (char *)
+    // - video_transfer (int)
+
+
+    char * content_type_tmp;
+    int video_transfer = 0;
+
+    if      (filetype == NULL)          {content_type_tmp = "application/octet-stream";}
+    else if (strcmp(filetype, "txt" ))  {content_type_tmp = "text/plain";}
+    else if (strcmp(filetype, "css" ))  {content_type_tmp = "text/css";}
+    else if (strcmp(filetype, "htm" ))  {content_type_tmp = "text/html";}
+    else if (strcmp(filetype, "html"))  {content_type_tmp = "text/html";}
+    else if (strcmp(filetype, "jpg" ))  {content_type_tmp = "image/jpeg";}
+    else if (strcmp(filetype, "jpeg"))  {content_type_tmp = "image/jpeg";}
+    else if (strcmp(filetype, "png" ))  {content_type_tmp = "image/png";}
+    else if (strcmp(filetype, "js"  ))  {content_type_tmp = "application/javascript";}
+    else if (strcmp(filetype, "mp4" ))  {content_type_tmp = "video/webm"; video_transfer = 1;}
+    else if (strcmp(filetype, "webm"))  {content_type_tmp = "video/webm"; video_transfer = 1;}
+    else if (strcmp(filetype, "ogg" ))  {content_type_tmp = "video/webm"; video_transfer = 1;}
+    else                                {exit(1);}
+
+
+    strncpy(content_type, content_type_tmp, sizeof(content_type));
+    return video_transfer;
+}
+
+
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
@@ -209,7 +391,6 @@ int main(int argc, char *argv[]) {
             strcpy(request, buffer);
 
             // using strtok to tokenize the request
-            int count = 0;
             process_startline(request, &method, &path, &version);
 
             char pathstr[strlen(path) + 1];
@@ -219,65 +400,48 @@ int main(int argc, char *argv[]) {
             printf("[INFO] pathstr: %s, length: %d\n", pathstr, strlen(pathstr));
             printf("[INFO] method: %s, path: %s, version: %s \n\n", method, path, version);
 
-            if(strlen(path) > 1) {
+            /*if(strlen(path) > 1) {
                 // for a fully specified path, parse filename and filetype
                 parse_http_uri(path, &filename, &filetype);
                 printf("[INFO] filename: %s, filetype: %s\n", filename, filetype);
-            }
-
-
+            }*/
 
 
             if(strcmp(pathstr, "/") == 0) {
                 char* message = "HTTP/1.1 200 OK\r\n"
                                 "Content-Type: text/html; charset=UTF-8\r\n\r\n"
                                 "<html><body>Hello World!</body></html>\r\n";
+
                 send(new_fd, message, strlen(message), 0);
+
+                close(new_fd);
+                exit(0);
             }
 
-            else if(filetype != NULL && strcmp(filetype,"txt") == 0) {
-                printf("text files!\n");
+            parse_http_uri(path, &filename, &filetype);
+            printf("[INFO] filename: %s, filetype: %s\n", filename, filetype);
 
-                char headers[1000];
-                char file_location[sizeof("/content") + sizeof(path)] = "./content";
+            char file_location[sizeof("/content") + sizeof(path)] = "./content";
+            strcat(file_location, path);
 
-                strcat(file_location, path);
+            if (access(file_location, F_OK) == 0) {
+                // lookup the file's content type
+                char content_type[100];
 
-                int fd = open(file_location, O_RDONLY);
+                int is_video_transfer = content_type_lookup(content_type, filetype);
 
-                if (fd == -1) {
-                    perror("Error opening text file");
+                if (is_video_transfer) {
+                    printf("transferring video file\n");
 
                     char* message = "HTTP/1.1 404 Not Found\r\n"
                                 "Content-Type: text/html; charset=UTF-8\r\n\r\n"
                                 "<html><body>404 Not Found</body></html>\r\n";
                     send(new_fd, message, strlen(message), 0);
-                    close(new_fd);
-                    exit(1);
+
+                    //transfer_video_file(buffer, file_location, new_fd, content_type);
+                } else {
+                    transfer_standard_file(file_location, new_fd, content_type);
                 }
-
-                off_t file_size = lseek(fd, 0, SEEK_END);
-
-                sprintf(headers, "HTTP/1.1 200 OK\r\n"
-                                 "Content-Type: text/plain; charset=UTF-8\r\n"
-                                 "Content-Length: %ld\r\n"
-                                 "Connection: Keep-Alive\r\n\r\n", file_size);
-
-
-                send(new_fd, headers, strlen(headers), 0);
-
-                char buffer[4096];
-
-                // reposition file offset to the start of the file
-                lseek(fd, 0, SEEK_SET);
-
-                ssize_t bytes_read;
-
-                while ((bytes_read = read(fd, buffer, sizeof(buffer))) > 0) {
-                    send(new_fd, buffer, bytes_read, 0);
-                }
-
-                close(fd);
 
             } else {
                 char* message = "HTTP/1.1 404 Not Found\r\n"
@@ -286,8 +450,19 @@ int main(int argc, char *argv[]) {
                 send(new_fd, message, strlen(message), 0);
             }
 
-            free(filename);
-            free(filetype);
+
+            //printf("[INFO] filename: %s, filetype: %s\n", filename, filetype);
+
+            /*if (filename) {
+                printf("t1");
+                free(filename);
+            }
+
+            if (filetype) {
+                printf("t2");
+                free(filetype);
+            }*/
+
             close(new_fd);
             exit(0);
         }

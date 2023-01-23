@@ -40,9 +40,23 @@ void *get_in_addr(struct sockaddr *sa) {
 // HTTP Processing functions
 
 void generate_timestamp(char *buf) {
-    time_t now = time(0);
-    struct tm tm = *gmtime(&now);
-    strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S %Z", &tm);
+    //time_t now = time(0);
+    //struct tm tm_ = *gmtime(&now);
+    //strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S %Z", &tm_);
+
+    time_t current_time; // the date string
+
+    struct tm *time_info;
+    char time_string[100];
+
+    time(&current_time);
+    time_info = gmtime(&current_time);
+    strftime(time_string, sizeof(time_string), "%a, %d %b %Y %H:%M:%S GMT", time_info);
+
+    //printf("NOTICE: %s\n", time_string);
+
+    strcpy(buf, time_string);
+
 }
 
 void process_startline(char *request, char **method, char **path, char **version) {
@@ -75,7 +89,7 @@ void parse_http_uri(const char *path, char **filename, char **filetype) {
     strtok(*filetype, ".");
     *filetype = strtok(NULL, ".");
 
-    printf("[INFO]: filename: %s, filetype: %s\n", *filename, *filetype);
+    //printf("[INFO]: filename: %s, filetype: %s\n", *filename, *filetype);
 }
 
 void transfer_file_chunk(char *og_req_buffer, char *file_path, int socket_fd,
@@ -396,7 +410,7 @@ int main(int argc, char *argv[]) {
             get_in_addr((struct sockaddr *)&their_addr),
             s, sizeof(s));
 
-        printf("Server: got connection from %s\n", s);
+        //printf("Server: got connection from %s\n", s);
 
         // spawn a child process to handle new connection
         pid_t pid = fork();
@@ -426,8 +440,8 @@ int main(int argc, char *argv[]) {
 
             strcpy(pathstr, path);
 
-            printf("[INFO] pathstr: %s, length: %d\n", pathstr, strlen(pathstr));
-            printf("[INFO] method: %s, path: %s, version: %s \n\n", method, path, version);
+            //printf("[INFO] pathstr: %s, length: %d\n", pathstr, strlen(pathstr));
+            //printf("[INFO] method: %s, path: %s, version: %s \n\n", method, path, version);
 
             /*if(strlen(path) > 1) {
                 // for a fully specified path, parse filename and filetype
@@ -437,9 +451,15 @@ int main(int argc, char *argv[]) {
 
 
             if(strcmp(pathstr, "/") == 0) {
-                char* message = "HTTP/1.1 200 OK\r\n"
-                                "Content-Type: text/html; charset=UTF-8\r\n\r\n"
-                                "<html><body>Hello World!</body></html>\r\n";
+                char message[200];
+                char date_timestamp[100];
+                generate_timestamp(date_timestamp);
+
+                sprintf(message,"HTTP/1.1 200 OK\r\n"
+                                "Content-Type: text/html; charset=UTF-8\r\n"
+                                "Date: %s\r\n"
+                                "<html><body>Hello World!</body></html>\r\n\r\n",
+                                date_timestamp);
 
                 send(new_fd, message, strlen(message), 0);
 
@@ -448,7 +468,7 @@ int main(int argc, char *argv[]) {
             }
 
             parse_http_uri(path, &filename, &filetype);
-            printf("[INFO] filename: %s, filetype: %s\n", filename, filetype);
+            //printf("[INFO] filename: %s, filetype: %s\n", filename, filetype);
 
             char file_location[sizeof("/content") + sizeof(path)] = "./content";
             strcat(file_location, path);

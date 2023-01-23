@@ -1,5 +1,7 @@
 # Instruction to Start Server
 
+Design doc location: https://docs.google.com/document/d/1TXFtoXJwDS0cmcqsKqL0H-cUqX7ZJrGzrEKIrFhsiCY/edit?usp=sharing
+
 Go to the directory: `hw1`, execute one of the follwoing:
 
 ```

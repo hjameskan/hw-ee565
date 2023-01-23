@@ -72,9 +72,9 @@ void parse_http_uri(const char *path, char **filename, char **filetype) {
     printf("[INFO]: filename: %s, filetype: %s\n", *filename, *filetype);
 }
 
-void transfer_video_file(char *og_req_buffer, char *file_path, int socket_fd, char *content_type) {
+void transfer_file_chunk(char *og_req_buffer, char *file_path, int socket_fd,
+                    char *content_type) {
     // seperate http response file tranfer routine for video-type files
-
 
     // open the file
     int fd = open(file_path, O_RDONLY);
@@ -113,48 +113,63 @@ void transfer_video_file(char *og_req_buffer, char *file_path, int socket_fd, ch
             range_end = file_size - 1;
         }
         // check if range starts from 0
-        if (range_start == 0) {
+        if (range_start >= 0 && range_start < file_size) {
             if (range_end >= file_size) {
                 range_end = file_size - 1; // adjust end range to the end of the file
             }
-            // send "206 Partial Content" response with appropriate Content-Range header
-            sprintf(headers, "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 0-%ld/%ld\r\nContent-Type: video/webm\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", range_end, file_size, last_modified);
+
+            if (range_start == 0) {
+                // send "206 Partial Content" response with appropriate Content-Range header
+                sprintf(headers, "HTTP/1.1 206 Partial Content\r\n"
+                                "Content-Range: bytes 0-%ld/%ld\r\n"
+                                "Content-Type: %s\r\nLast-Modified: %s\r\n"
+                                "Connection: Keep-Alive\r\n\r\n",
+                                range_end, file_size, content_type, last_modified);
+            } else {
+                // send "206 Partial Content" response with appropriate Content-Range header
+                sprintf(headers, "HTTP/1.1 206 Partial Content\r\n"
+                             "Content-Range: bytes %ld-%ld/%ld\r\n"
+                             "Content-Type: %s\r\nLast-Modified: %s\r\n"
+                             "Connection: Keep-Alive\r\n\r\n",
+                             range_start, range_end, file_size, content_type, last_modified);
+            }
+
             send(socket_fd, headers, strlen(headers), 0);
             // send the requested range of bytes
             lseek(fd, range_start, SEEK_SET);
+
             char buffer[4096];
-            ssize_t bytes_read;
-            while ((bytes_read = read(fd, buffer, sizeof(buffer))) > 0) {
+            ssize_t bytes_read, bytes_to_read;
+
+            bytes_to_read = range_end - range_start + 1;
+
+            while (bytes_to_read > 0) {
+                if (sizeof(buffer) > bytes_to_read) {
+                    bytes_read = read(fd, buffer, bytes_to_read);
+                } else {
+                    bytes_read = read(fd, buffer, sizeof(buffer));
+                }
+
                 send(socket_fd, buffer, bytes_read, 0);
-            }
-        } else if (range_start < file_size) {
-            if (range_end >= file_size) {
-                range_end = file_size - 1; // adjust end range to the end of the file
-            }
-            // send "206 Partial Content" response with appropriate Content-Range header
-            sprintf(headers, "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes %ld-%ld/%ld\r\n"
-                             "Content-Type: video/webm\r\nLast-Modified: %s\r\n"
-                             "Connection: Keep-Alive\r\n\r\n", range_start, range_end, file_size, last_modified);
-            send(socket_fd, headers, strlen(headers), 0);
-            // send the requested range of bytes
-            lseek(fd, range_start, SEEK_SET);
-            char buffer[4096];
-            ssize_t bytes_read;
-            while ((bytes_read = read(fd, buffer, sizeof(buffer))) > 0) {
-                send(socket_fd, buffer, bytes_read, 0);
+                bytes_to_read -= bytes_read;
             }
         } else {
             // send "416 Range Not Satisfiable" response if range is not valid
-            char * message = "HTTP/1.1 416 Range Not Satisfiable\r\n"
+            sprintf(headers, "HTTP/1.1 416 Range Not Satisfiable\r\n"
             "Content-Range: bytes */%ld\r\n"
             "Content-Type: text/html; charset=UTF-8\r\n\r\n"
-            "<html><body>416 Range Not Satisfiable</body></html>\r\n", file_size;
-            send(socket_fd, message, strlen(message), 0);
+            "<html><body>416 Range Not Satisfiable</body></html>\r\n", file_size);
+            send(socket_fd, headers, strlen(headers), 0);
         }
     } else {
         // send "200 OK" response if no range is specified
-        sprintf(headers, "HTTP/1.1 200 OK\r\nContent-Type: video/webm\r\nContent-Length: %ld\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", file_size, last_modified);
+        sprintf(headers, "HTTP/1.1 200 OK\r\nContent-Type: %s\r\n"
+                        "Content-Length: %ld\r\nLast-Modified: %s\r\n"
+                        "Connection: Keep-Alive\r\n\r\n",
+                        content_type, file_size, last_modified);
+
         send(socket_fd, headers, strlen(headers), 0);
+
         char buffer[4096];
         ssize_t bytes_read;
         while ((bytes_read = read(fd, buffer, sizeof(buffer))) > 0) {
@@ -234,22 +249,22 @@ int content_type_lookup(char *content_type, char *filetype) {
     char * content_type_tmp;
     int video_transfer = 0;
 
-    if      (filetype == NULL)          {content_type_tmp = "application/octet-stream";}
-    else if (strcmp(filetype, "txt" ))  {content_type_tmp = "text/plain";}
-    else if (strcmp(filetype, "css" ))  {content_type_tmp = "text/css";}
-    else if (strcmp(filetype, "htm" ))  {content_type_tmp = "text/html";}
-    else if (strcmp(filetype, "html"))  {content_type_tmp = "text/html";}
-    else if (strcmp(filetype, "jpg" ))  {content_type_tmp = "image/jpeg";}
-    else if (strcmp(filetype, "jpeg"))  {content_type_tmp = "image/jpeg";}
-    else if (strcmp(filetype, "png" ))  {content_type_tmp = "image/png";}
-    else if (strcmp(filetype, "js"  ))  {content_type_tmp = "application/javascript";}
-    else if (strcmp(filetype, "mp4" ))  {content_type_tmp = "video/webm"; video_transfer = 1;}
-    else if (strcmp(filetype, "webm"))  {content_type_tmp = "video/webm"; video_transfer = 1;}
-    else if (strcmp(filetype, "ogg" ))  {content_type_tmp = "video/webm"; video_transfer = 1;}
-    else                                {exit(1);}
+    if      (filetype == NULL)               {content_type_tmp = "application/octet-stream";}
+    else if (strcmp(filetype, "txt" ) == 0)  {content_type_tmp = "text/plain";}
+    else if (strcmp(filetype, "css" ) == 0)  {content_type_tmp = "text/css";}
+    else if (strcmp(filetype, "htm" ) == 0)  {content_type_tmp = "text/html";}
+    else if (strcmp(filetype, "html") == 0)  {content_type_tmp = "text/html";}
+    else if (strcmp(filetype, "jpg" ) == 0)  {content_type_tmp = "image/jpeg";}
+    else if (strcmp(filetype, "jpeg") == 0)  {content_type_tmp = "image/jpeg";}
+    else if (strcmp(filetype, "png" ) == 0)  {content_type_tmp = "image/png";}
+    else if (strcmp(filetype, "js"  ) == 0)  {content_type_tmp = "application/javascript";}
+    else if (strcmp(filetype, "mp4" ) == 0)  {content_type_tmp = "video/webm"; video_transfer = 1;}
+    else if (strcmp(filetype, "webm") == 0)  {content_type_tmp = "video/webm"; video_transfer = 1;}
+    else if (strcmp(filetype, "ogg" ) == 0)  {content_type_tmp = "video/webm"; video_transfer = 1;}
+    else                                     {exit(1);}
 
 
-    strncpy(content_type, content_type_tmp, sizeof(content_type));
+    strcpy(content_type, content_type_tmp);
     return video_transfer;
 }
 
@@ -426,22 +441,16 @@ int main(int argc, char *argv[]) {
 
             if (access(file_location, F_OK) == 0) {
                 // lookup the file's content type
-                char content_type[100];
+                char content_type[200];
 
                 int is_video_transfer = content_type_lookup(content_type, filetype);
 
-                if (is_video_transfer) {
-                    printf("transferring video file\n");
-
-                    char* message = "HTTP/1.1 404 Not Found\r\n"
-                                "Content-Type: text/html; charset=UTF-8\r\n\r\n"
-                                "<html><body>404 Not Found</body></html>\r\n";
-                    send(new_fd, message, strlen(message), 0);
-
-                    //transfer_video_file(buffer, file_location, new_fd, content_type);
-                } else {
-                    transfer_standard_file(file_location, new_fd, content_type);
-                }
+                // open the file
+                //if (is_video_transfer){
+                    transfer_file_chunk(buffer, file_location, new_fd, content_type);
+                //} else {
+                //    transfer_standard_file(file_location, new_fd, content_type);
+                //}
 
             } else {
                 char* message = "HTTP/1.1 404 Not Found\r\n"

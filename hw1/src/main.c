@@ -224,7 +224,9 @@ int main(int argc, char *argv[]) {
                             range_end = file_size - 1; // adjust end range to the end of the file
                         }
                         // send "206 Partial Content" response with appropriate Content-Range header
-                        sprintf(headers, "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 0-%ld/%ld\r\nContent-Type: video/webm\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", range_end, file_size, last_modified);
+                        char *last_period = strrchr(filename, '.');
+                        char *filesubstring = strdup(last_period + 1);
+                        sprintf(headers, "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 0-%ld/%ld\r\nContent-Type: %s/%s\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", range_end, file_size, type, filesubstring, last_modified);
                         send(new_fd, headers, strlen(headers), 0);
                         // send the requested range of bytes
                         lseek(fd, range_start, SEEK_SET);
@@ -238,7 +240,9 @@ int main(int argc, char *argv[]) {
                             range_end = file_size - 1; // adjust end range to the end of the file
                         }
                         // send "206 Partial Content" response with appropriate Content-Range header
-                        sprintf(headers, "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes %ld-%ld/%ld\r\nContent-Type: video/webm\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", range_start, range_end, file_size, last_modified);
+                        char *last_period = strrchr(filename, '.');
+                        char *filesubstring = strdup(last_period + 1);
+                        sprintf(headers, "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes %ld-%ld/%ld\r\nContent-Type: %s/%s\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", range_start, range_end, file_size, type, filesubstring, last_modified);
                         send(new_fd, headers, strlen(headers), 0);
                         // send the requested range of bytes
                         lseek(fd, range_start, SEEK_SET);
@@ -259,8 +263,6 @@ int main(int argc, char *argv[]) {
                     // send "200 OK" response if no range is specified
                     char *last_period = strrchr(filename, '.');
                     char *filesubstring = strdup(last_period + 1);
-                    // printf("aaaaaa %s", filesubstring);
-                    // printf("bbb %s", type);
                     sprintf(headers, "HTTP/1.1 200 OK\r\nContent-Type: %s/%s\r\nContent-Length: %ld\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", type, filesubstring, file_size, last_modified);
                     send(new_fd, headers, strlen(headers), 0);
                     char buffer[4096];
@@ -319,7 +321,9 @@ int main(int argc, char *argv[]) {
                             range_end = file_size - 1; // adjust end range to the end of the file
                         }
                         // send "206 Partial Content" response with appropriate Content-Range header
-                        sprintf(headers, "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 0-%ld/%ld\r\nContent-Type: image/png\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", range_end, file_size, last_modified);
+                        char *last_period = strrchr(filename, '.');
+                        char *filesubstring = strdup(last_period + 1);
+                        sprintf(headers, "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 0-%ld/%ld\r\nContent-Type: %s/%s\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", range_end, file_size, type, filesubstring, last_modified);
                         send(new_fd, headers, strlen(headers), 0);
                         // send the requested range of bytes
                         lseek(fd, range_start, SEEK_SET);
@@ -333,7 +337,9 @@ int main(int argc, char *argv[]) {
                             range_end = file_size - 1; // adjust end range to the end of the file
                         }
                         // send "206 Partial Content" response with appropriate Content-Range header
-                        sprintf(headers, "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes %ld-%ld/%ld\r\nContent-Type: image/png\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", range_start, range_end, file_size, last_modified);
+                        char *last_period = strrchr(filename, '.');
+                        char *filesubstring = strdup(last_period + 1);
+                        sprintf(headers, "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes %ld-%ld/%ld\r\nContent-Type: %s/%s\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", range_start, range_end, file_size, type, filesubstring, last_modified);
                         send(new_fd, headers, strlen(headers), 0);
                         // send the requested range of bytes
                         lseek(fd, range_start, SEEK_SET);
@@ -353,8 +359,6 @@ int main(int argc, char *argv[]) {
                 } else {
                     char *last_period = strrchr(filename, '.');
                     char *filesubstring = strdup(last_period + 1);
-                    // printf("aaaaaa %s", filesubstring);
-                    // printf("bbb %s", type);
                     sprintf(headers, "HTTP/1.1 200 OK\r\nContent-Type: %s/%s\r\nContent-Length: %ld\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", type, filesubstring, file_size, last_modified);
                     send(new_fd, headers, strlen(headers), 0);
                     char buffer[4096];
@@ -386,17 +390,76 @@ int main(int argc, char *argv[]) {
                 fstat(fd, & stat_buf);
                 localtime_r( & stat_buf.st_mtime, & timeinfo);
                 strftime(last_modified, sizeof last_modified, "%a, %d %b %Y %H:%M:%S %Z", & timeinfo);
-            
-                char *last_period = strrchr(filename, '.');
-                char *filesubstring = strdup(last_period + 1);
-                // printf("aaaaaa %s", filesubstring);
-                // printf("bbb %s", type);
-                sprintf(headers, "HTTP/1.1 200 OK\r\nContent-Type: %s/%s\r\nContent-Length: %ld\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", type, filesubstring, file_size, last_modified);
-                send(new_fd, headers, strlen(headers), 0);
-                char buffer[4096];
-                ssize_t bytes_read;
-                while ((bytes_read = read(fd, buffer, sizeof buffer)) > 0) {
-                    send(new_fd, buffer, bytes_read, 0);
+
+                if (strstr(buffer, "Range:")) {
+                    char * range_start;
+                    char * range_end;
+                    // extract the range values from the headers
+                    char *range_header = strstr(buffer, "Range:");
+                    // sscanf(buffer, "Range: bytes=%ld-%ld", & range_start, & range_end);
+                    char *range_start_str;
+                    char *range_end_str;
+                    range_start_str = strchr(range_header, '=') + 1;
+                    range_end_str = strchr(range_start_str, '-');
+                    if (range_end_str && isdigit((unsigned char)*(range_end_str+1))) {
+                        *range_end_str = '\0'; // replace '-' with null character
+                        range_start = strtol(range_start_str, NULL, 10);
+                        range_end = strtol(range_end_str + 1, NULL, 10);
+                    } else {
+                        range_start = strtol(range_start_str, NULL, 10);
+                        range_end = file_size - 1;
+                    }
+                    // check if range starts from 0
+                    if (range_start == 0) {
+                        if (range_end >= file_size) {
+                            range_end = file_size - 1; // adjust end range to the end of the file
+                        }
+                        // send "206 Partial Content" response with appropriate Content-Range header
+                        char *last_period = strrchr(filename, '.');
+                        char *filesubstring = strdup(last_period + 1);
+                        sprintf(headers, "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 0-%ld/%ld\r\nContent-Type: %s/%s\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", range_end, file_size, type, filesubstring, last_modified);
+                        send(new_fd, headers, strlen(headers), 0);
+                        // send the requested range of bytes
+                        lseek(fd, range_start, SEEK_SET);
+                        char buffer[4096];
+                        ssize_t bytes_read;
+                        while ((bytes_read = read(fd, buffer, sizeof buffer)) > 0) {
+                            send(new_fd, buffer, bytes_read, 0);
+                        }
+                    } else if (range_start < file_size) {
+                        if (range_end >= file_size) {
+                            range_end = file_size - 1; // adjust end range to the end of the file
+                        }
+                        // send "206 Partial Content" response with appropriate Content-Range header
+                        char *last_period = strrchr(filename, '.');
+                        char *filesubstring = strdup(last_period + 1);
+                        sprintf(headers, "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes %ld-%ld/%ld\r\nContent-Type: %s/%s\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", range_start, range_end, file_size, type, filesubstring, last_modified);
+                        send(new_fd, headers, strlen(headers), 0);
+                        // send the requested range of bytes
+                        lseek(fd, range_start, SEEK_SET);
+                        char buffer[4096];
+                        ssize_t bytes_read;
+                        while ((bytes_read = read(fd, buffer, sizeof buffer)) > 0) {
+                            send(new_fd, buffer, bytes_read, 0);
+                        }
+                    } else {
+                        // send "416 Range Not Satisfiable" response if range is not valid
+                        char * message = "HTTP/1.1 416 Range Not Satisfiable\r\n"
+                        "Content-Range: bytes */%ld\r\n"
+                        "Content-Type: text/html; charset=UTF-8\r\n\r\n"
+                        "<html><body>416 Range Not Satisfiable</body></html>\r\n", file_size;
+                        send(new_fd, message, strlen(message), 0);
+                    }
+                } else {
+                    char *last_period = strrchr(filename, '.');
+                    char *filesubstring = strdup(last_period + 1);
+                    sprintf(headers, "HTTP/1.1 200 OK\r\nContent-Type: %s/%s\r\nContent-Length: %ld\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", type, filesubstring, file_size, last_modified);
+                    send(new_fd, headers, strlen(headers), 0);
+                    char buffer[4096];
+                    ssize_t bytes_read;
+                    while ((bytes_read = read(fd, buffer, sizeof buffer)) > 0) {
+                        send(new_fd, buffer, bytes_read, 0);
+                    }
                 }
             }
             else if (count == 2 && strcmp(type, "application") == 0) {
@@ -421,17 +484,76 @@ int main(int argc, char *argv[]) {
                 fstat(fd, & stat_buf);
                 localtime_r( & stat_buf.st_mtime, & timeinfo);
                 strftime(last_modified, sizeof last_modified, "%a, %d %b %Y %H:%M:%S %Z", & timeinfo);
-            
-                char *last_period = strrchr(filename, '.');
-                char *filesubstring = strdup(last_period + 1);
-                // printf("aaaaaa %s", filesubstring);
-                // printf("bbb %s", type);
-                sprintf(headers, "HTTP/1.1 200 OK\r\nContent-Type: %s/%s\r\nContent-Length: %ld\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", type, filesubstring, file_size, last_modified);
-                send(new_fd, headers, strlen(headers), 0);
-                char buffer[4096];
-                ssize_t bytes_read;
-                while ((bytes_read = read(fd, buffer, sizeof buffer)) > 0) {
-                    send(new_fd, buffer, bytes_read, 0);
+
+                if (strstr(buffer, "Range:")) {
+                    char * range_start;
+                    char * range_end;
+                    // extract the range values from the headers
+                    char *range_header = strstr(buffer, "Range:");
+                    // sscanf(buffer, "Range: bytes=%ld-%ld", & range_start, & range_end);
+                    char *range_start_str;
+                    char *range_end_str;
+                    range_start_str = strchr(range_header, '=') + 1;
+                    range_end_str = strchr(range_start_str, '-');
+                    if (range_end_str && isdigit((unsigned char)*(range_end_str+1))) {
+                        *range_end_str = '\0'; // replace '-' with null character
+                        range_start = strtol(range_start_str, NULL, 10);
+                        range_end = strtol(range_end_str + 1, NULL, 10);
+                    } else {
+                        range_start = strtol(range_start_str, NULL, 10);
+                        range_end = file_size - 1;
+                    }
+                    // check if range starts from 0
+                    if (range_start == 0) {
+                        if (range_end >= file_size) {
+                            range_end = file_size - 1; // adjust end range to the end of the file
+                        }
+                        // send "206 Partial Content" response with appropriate Content-Range header
+                        char *last_period = strrchr(filename, '.');
+                        char *filesubstring = strdup(last_period + 1);
+                        sprintf(headers, "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 0-%ld/%ld\r\nContent-Type: %s/%s\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", range_end, file_size, type, filesubstring, last_modified);
+                        send(new_fd, headers, strlen(headers), 0);
+                        // send the requested range of bytes
+                        lseek(fd, range_start, SEEK_SET);
+                        char buffer[4096];
+                        ssize_t bytes_read;
+                        while ((bytes_read = read(fd, buffer, sizeof buffer)) > 0) {
+                            send(new_fd, buffer, bytes_read, 0);
+                        }
+                    } else if (range_start < file_size) {
+                        if (range_end >= file_size) {
+                            range_end = file_size - 1; // adjust end range to the end of the file
+                        }
+                        // send "206 Partial Content" response with appropriate Content-Range header
+                        char *last_period = strrchr(filename, '.');
+                        char *filesubstring = strdup(last_period + 1);
+                        sprintf(headers, "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes %ld-%ld/%ld\r\nContent-Type: %s/%s\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", range_start, range_end, file_size, type, filesubstring, last_modified);
+                        send(new_fd, headers, strlen(headers), 0);
+                        // send the requested range of bytes
+                        lseek(fd, range_start, SEEK_SET);
+                        char buffer[4096];
+                        ssize_t bytes_read;
+                        while ((bytes_read = read(fd, buffer, sizeof buffer)) > 0) {
+                            send(new_fd, buffer, bytes_read, 0);
+                        }
+                    } else {
+                        // send "416 Range Not Satisfiable" response if range is not valid
+                        char * message = "HTTP/1.1 416 Range Not Satisfiable\r\n"
+                        "Content-Range: bytes */%ld\r\n"
+                        "Content-Type: text/html; charset=UTF-8\r\n\r\n"
+                        "<html><body>416 Range Not Satisfiable</body></html>\r\n", file_size;
+                        send(new_fd, message, strlen(message), 0);
+                    }
+                } else {
+                    char *last_period = strrchr(filename, '.');
+                    char *filesubstring = strdup(last_period + 1);
+                    sprintf(headers, "HTTP/1.1 200 OK\r\nContent-Type: %s/%s\r\nContent-Length: %ld\r\nLast-Modified: %s\r\nConnection: Keep-Alive\r\n\r\n", type, filesubstring, file_size, last_modified);
+                    send(new_fd, headers, strlen(headers), 0);
+                    char buffer[4096];
+                    ssize_t bytes_read;
+                    while ((bytes_read = read(fd, buffer, sizeof buffer)) > 0) {
+                        send(new_fd, buffer, bytes_read, 0);
+                    }
                 }
             }
             else {

@@ -1,5 +1,5 @@
 #include "uri_parse.h"
-
+#include "http_utils.h"
 
 // HTTP Processing functions
 void process_startline(char *request, char **method, char **path, char **version) {
@@ -72,4 +72,135 @@ int content_type_lookup(char *content_type, char *filetype) {
 
     strcpy(content_type, content_type_tmp);
     return video_transfer;
+}
+
+
+
+//int is_peer_path(char *path_string) {
+//    char *first_token = strtok(path_string, "/");
+//    printf("[DEBUG] first token: %s %d\n", first_token, strcmp(first_token, "peer"));
+//    return (strcmp(first_token, "peer") == 0);
+//}
+
+void process_peer_path(char *path_string, int connect_fd) {
+
+    char *rest = path_string;
+    char *first_token = strtok_r(path_string, "/", &rest);
+
+    if (strcmp(first_token, "peer") != 0) {
+        printf("not peer req\n");
+        return;
+    }
+
+    char *peer_cmd = strtok_r(NULL, "/?", &rest);
+    printf("command: %s\n", peer_cmd);
+
+
+    if      (strcmp(peer_cmd, "add"    ) == 0) {
+        printf("/peer/add parsed!\n");
+        struct add_info {
+            char *path;
+            char *host;
+            int port;
+            int rate;
+        } add_info;
+
+        memset(&add_info, 0, sizeof(struct add_info)); // clear out struct contents... maybe
+
+        char *new_token;
+
+        while ((new_token = strtok_r(NULL, "&", &rest))) {
+            char *remainder, *field_name, *data;
+
+            remainder = new_token;
+            field_name = strtok_r(new_token, "=", &remainder);
+            data = strtok_r(NULL, "=", &remainder);
+
+            //printf("field_name: %s\n", field_name);
+            //printf("data: %s\n", data);
+            //printf("-----------\n");
+
+
+            if      (strcmp(field_name, "path" ) == 0) {
+                add_info.path = data;
+            }
+            else if (strcmp(field_name, "host" ) == 0) {
+                add_info.host = data;
+            }
+            else if (strcmp(field_name, "port" ) == 0) {
+                add_info.port = atoi(data);
+            }
+            else if (strcmp(field_name, "rate" ) == 0) {
+                add_info.rate = atoi(data);
+            }
+
+        }
+
+        printf("\n");
+        printf("test path %s\n", add_info.path);
+        printf("test host %s\n", add_info.host);
+        printf("test port %d\n", add_info.port);
+        printf("test rate %d\n", add_info.rate);
+
+
+        // ********************************
+        // PERFORM /PEER/ADD work here
+        // ********************************
+
+        send_http_200(connect_fd);
+        exit(0);
+    }
+    else if (strcmp(peer_cmd, "view"   ) == 0) {
+        printf("\n/peer/view/ parsed!\n");
+        char *content_path = strtok_r(NULL, "", &rest); // here is the content path
+
+        printf("/peer/view/ content_path: %s\n", content_path);
+
+        // ********************************
+        // PERFORM /PEER/VIEW work here
+        // ********************************
+
+        send_http_200(connect_fd); // note: for now we will send a 200 response
+        exit(0);                   // but later, we will need to provide requested content
+
+    }
+    else if (strcmp(peer_cmd, "config" ) == 0) {
+        printf("/peer/config parsed!\n");
+        int rate;
+
+        // get rest/last token of config command
+        char *config_options = strtok_r(NULL, "", &rest);
+        char *remainder = config_options;
+
+        // strip off the command's option argument type ('rate' here)
+        strtok_r(config_options, "=", &remainder);
+
+        // then take rest of string (if only 'rate' was supplied, this is its value),
+        // convert to int
+        rate = atoi(strtok_r(NULL, "&", &remainder));
+
+        printf("/peer/config/ rate: %d\n", rate);
+
+        // ********************************
+        // PERFORM /PEER/CONFIG work here
+        // ********************************
+
+        send_http_200(connect_fd);
+        exit(0);
+    }
+    else if (strcmp(peer_cmd, "status" ) == 0) {
+        printf("/peer/status parsed!\n");
+
+        // ********************************
+        // PERFORM /PEER/STATUS work here
+        // ********************************
+
+        send_http_200(connect_fd);
+        exit(0);
+    }
+
+
+
+
+    exit(0);
 }

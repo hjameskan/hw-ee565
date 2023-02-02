@@ -175,7 +175,7 @@ void transfer_standard_file(char *file_path, int socket_fd, char *content_type) 
     strftime(last_modified, sizeof last_modified, "%a, %d %b %Y %H:%M:%S %Z", & timeinfo);
 
     sprintf(headers, "HTTP/1.1 200 OK\r\nContent-Type: %s\r\n"
-                     "Content-Length: %ld\r\nLast-Modified: %s\r\n"
+                     "Content-Length: %ld\r\nLast-Modified: %s\r\n\r\n"
                      "Connection: Keep-Alive\r\n\r\n", content_type, file_size, last_modified);
 
     send(socket_fd, headers, strlen(headers), 0);
@@ -184,4 +184,25 @@ void transfer_standard_file(char *file_path, int socket_fd, char *content_type) 
     while ((bytes_read = read(fd, buffer, sizeof buffer)) > 0) {
         send(socket_fd, buffer, bytes_read, 0);
     }
+}
+
+
+
+void send_http_200(int connection_fd) {
+    char message[200];
+    char date_timestamp[100];
+
+    generate_timestamp(date_timestamp);
+
+    sprintf(message,"HTTP/1.1 200 OK\r\n"
+                    "Content-Type: text/html; charset=UTF-8\r\n"
+                     // note: we place double <CR> <LF> here since
+                     // the following part of the response is the content payload
+                    "Date: %s\r\n\r\n"
+                    "<html><body>Hello World!</body></html>\r\n",
+                    date_timestamp);
+
+    send(connection_fd, message, strlen(message), 0);
+
+    close(connection_fd);
 }

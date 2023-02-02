@@ -2,3 +2,6 @@
 .vscode/*
 vodserver
 */content/video/*.bak
+udp-server
+udp-client
+*.dSYM

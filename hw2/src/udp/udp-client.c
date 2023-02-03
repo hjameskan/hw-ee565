@@ -1,83 +1,94 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
-#include <sys/types.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
 
-#define IP_ADDRESS "127.0.0.1"
-#define REQ_FILE_PATH "sample4.ogg"
-#define RECV_FILE_PATH "sample4_recv.ogg"
+#define MAX_PKT_SIZE 1024
 
-void download_file(int sockfd, struct sockaddr_in server_addr);
+struct packet {
+    int seq_num;
+    char data[MAX_PKT_SIZE];
+};
 
-int main(int argc, char **argv){
+int receive_packet(int sock, struct sockaddr_in *src_addr, struct packet *pkt) {
+    socklen_t addr_len = sizeof(struct sockaddr_in);
+    int bytes_received = recvfrom(sock, pkt, sizeof(struct packet), 0, (struct sockaddr *)src_addr, &addr_len);
 
-  if (argc != 2) {
-    printf("Usage: %s <port>\n", argv[0]);
-    exit(0);
-  }
-
-  char *ip = IP_ADDRESS;
-  int port = atoi(argv[1]);
-
-  int sockfd;
-  struct sockaddr_in addr;
-  char buffer[1024];
-  socklen_t addr_size;
-
-  sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-  memset(&addr, '\0', sizeof(addr));
-  addr.sin_family = AF_INET;
-  addr.sin_port = htons(port);
-  addr.sin_addr.s_addr = inet_addr(ip);
-
-  bzero(buffer, 1024);
-  strcpy(buffer, "Hello, World!");
-  sendto(sockfd, buffer, 1024, 0, (struct sockaddr*)&addr, sizeof(addr));
-  printf("[+]Data send: %s\n", buffer);
-
-  bzero(buffer, 1024);
-  addr_size = sizeof(addr);
-  recvfrom(sockfd, buffer, 1024, 0, (struct sockaddr*)&addr, &addr_size);
-  printf("[+]Data recv: %s\n", buffer);
-
-  download_file(sockfd, addr);
-
-  return 0;
-}
-
-void download_file(int sockfd, struct sockaddr_in server_addr){
-    char buffer[1024];
-    socklen_t addr_size;
-    addr_size = sizeof(server_addr);
-
-    strcpy(buffer, "transfer_file");
-    sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&server_addr, addr_size);
-
-    strcpy(buffer, REQ_FILE_PATH);
-    sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&server_addr, addr_size);
-
-    FILE *received_file = fopen(RECV_FILE_PATH, "wb");
-    if(received_file == NULL){
-        printf("[-]File creation failed\n");
-        fflush(stdout);
-        return;
+    if (bytes_received < 0) {
+        printf("Error receiving packet\n");
+        return -1;
     }
 
-    bzero(buffer, 1024);
-    int n_bytes = 0;
-    while((n_bytes = recvfrom(sockfd, buffer, 1024, 0, (struct sockaddr*)&server_addr, &addr_size)) > 0){
-        printf("[+]Received %d bytes\n", n_bytes);
-        fwrite(buffer, 1, n_bytes, received_file);
-        bzero(buffer, 1024);
-        if (n_bytes == 0 || n_bytes != 1024){
-            break;
+    return 0;
+}
+
+int send_ack(int sock, struct sockaddr_in *dest_addr, int seq_num) {
+    struct packet ack_pkt;
+    ack_pkt.seq_num = seq_num;
+
+    int bytes_sent = sendto(sock, &ack_pkt, sizeof(struct packet), 0, (struct sockaddr *)dest_addr, sizeof(struct sockaddr_in));
+
+    if (bytes_sent < 0) {
+        printf("Error sending ACK\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+int main() {
+    int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (sock < 0) {
+        printf("Error creating socket\n");
+        return -1;
+    }
+
+    struct sockaddr_in server_addr, client_addr;
+    memset(&client_addr, 0, sizeof(struct sockaddr_in));
+    client_addr.sin_family = AF_INET;
+    client_addr.sin_port = htons(0);
+    client_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    if (bind(sock, (struct sockaddr *)&client_addr, sizeof(struct sockaddr_in)) < 0) {
+        printf("Error binding socket\n");
+        return -1;
+    }
+
+    memset(&server_addr, 0, sizeof(struct sockaddr_in));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons("8346");
+    server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+    int seq_num = 0;
+
+    while (1) {
+        struct packet pkt;
+
+        if (receive_packet(sock, &server_addr, &pkt) < 0) {
+            printf("Error receiving packet\n");
+            return -1;
+        }
+
+        // Check if the packet is the expected one
+        if (pkt.seq_num == seq_num) {
+            // Send ACK for the received packet
+        if (send_ack(sock, &server_addr, pkt.seq_num) < 0) {
+            printf("Error sending ACK\n");
+            return -1;
+        }
+
+        if (pkt.seq_num == seq_num) {
+            // Process the received packet
+            printf("Received packet with seq_num: %d, data: %s\n", pkt.seq_num, pkt.data);
+            seq_num++;
+        } else {
+            // Send ACK for the previous packet
+            if (send_ack(sock, &server_addr, seq_num - 1) < 0) {
+                printf("Error sending ACK\n");
+                return -1;
+            }
         }
     }
 
-    fclose(received_file);
-    printf("[+]File received\n");
-    fflush(stdout);
+    return 0;
 }

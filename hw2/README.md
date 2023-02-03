@@ -23,7 +23,7 @@ http://localhost:8345/video/video.webm     # will play a webm video
 ```
 
 
-
+<br />
 
 # Docker
 
@@ -44,4 +44,19 @@ Start UDP client:
 In `new terminal window`, type:
 ```
 docker exec -it hw2 sh container-start-client.sh
+```
+
+
+<br />
+
+
+# How To Check If File Copy Is Identical?
+If two checksums are the same, then they are identical. (file names can be different but have the same checksum)
+```
+openssl sha512 [filepath]       
+```
+Example:
+```
+openssl sha512 sample4_recv.ogg
+openssl sha512 sample4.ogg
 ```

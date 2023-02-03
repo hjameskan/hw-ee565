@@ -12,6 +12,7 @@
 
 void *connection_handler(void *socket_desc);
 void transfer_file(int sockfd, struct sockaddr_in client_addr);
+void my_nanosleep(int nsec);
 
 int main(int argc, char **argv){
 
@@ -78,16 +79,19 @@ void *connection_handler(void *socket_desc){
 
   addr_size = sizeof(client_addr);
   bzero(buffer, 1024);
+  printf("Waiting for transfer_file command in thread, tid=%ld \n", pthread_self());
+  fflush(stdout);
   recvfrom(sockfd, buffer, 1024, 0, (struct sockaddr*)&client_addr, &addr_size);
   if (strncmp(buffer, "transfer_file", strlen("transfer_file")) == 0) {
     transfer_file(sockfd, client_addr);
-  } else {
-    printf("[+]Data recv from %s: %s\n", inet_ntoa(client_addr.sin_addr), buffer);
-    fflush(stdout);
-    sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&client_addr, addr_size);
-    printf("[+]Data sent to %s: %s\n", inet_ntoa(client_addr.sin_addr), buffer);
-    fflush(stdout);
   }
+  // else {
+  //   printf("[+]Data recv from %s: %s\n", inet_ntoa(client_addr.sin_addr), buffer);
+  //   fflush(stdout);
+  //   sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&client_addr, addr_size);
+  //   printf("[+]Data sent to %s: %s\n", inet_ntoa(client_addr.sin_addr), buffer);
+  //   fflush(stdout);
+  // }
 
   free(socket_desc);
   return 0;
@@ -116,10 +120,16 @@ void transfer_file(int sockfd, struct sockaddr_in client_addr){
 
     bzero(buffer, 1024);
     int n_bytes = 0;
+    printf("before while loop\n");
+    fflush(stdout);
     while((n_bytes = fread(buffer, 1, 1024, requested_file)) > 0){
+        printf("n_bytes = %d  \n", n_bytes);
+        fflush(stdout);
         int bytes_sent = 0;
         while(bytes_sent < n_bytes){
             int sent = sendto(sockfd, buffer + bytes_sent, n_bytes - bytes_sent, 0, (struct sockaddr*)&client_addr, addr_size);
+            printf("sent = %d  \n", sent);
+            fflush(stdout);
             if (sent < 0){
                 printf("[-]Failed to send data\n");
                 fflush(stdout);
@@ -127,6 +137,7 @@ void transfer_file(int sockfd, struct sockaddr_in client_addr){
                 return;
             }
             bytes_sent += sent;
+            my_nanosleep(1000000);
         }
         bzero(buffer, 1024);
     }
@@ -136,3 +147,9 @@ void transfer_file(int sockfd, struct sockaddr_in client_addr){
     fflush(stdout);
 }
 
+void my_nanosleep(int nsec){
+  struct timespec sleepTime;
+  sleepTime.tv_sec = 0;
+  sleepTime.tv_nsec = nsec; // 1 milliseconds = 1,000,000 nanoseconds
+  nanosleep(&sleepTime, NULL);
+}

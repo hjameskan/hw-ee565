@@ -5,13 +5,12 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <math.h>
 
 #define IP_ADDRESS "127.0.0.1"
 #define REQ_FILE_PATH "sample4.ogg"
 #define RECV_FILE_PATH "sample4_recv.ogg"
 
-void download_file(int sockfd, struct sockaddr_in server_addr, int start, int end);
+void download_file(int sockfd, struct sockaddr_in server_addr);
 
 int main(int argc, char **argv){
 
@@ -44,21 +43,18 @@ int main(int argc, char **argv){
   recvfrom(sockfd, buffer, 1024, 0, (struct sockaddr*)&addr, &addr_size);
   printf("[+]Data recv: %s\n", buffer);
 
-  download_file(sockfd, addr, 0, 20000);
+  download_file(sockfd, addr);
 
   return 0;
 }
 
-void download_file(int sockfd, struct sockaddr_in server_addr, int start, int end){
+void download_file(int sockfd, struct sockaddr_in server_addr){
     char buffer[1024];
     socklen_t addr_size;
     addr_size = sizeof(server_addr);
 
     strcpy(buffer, "transfer_file");
     sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&server_addr, addr_size);
-
-    sendto(sockfd, &start, sizeof(int), 0, (struct sockaddr*)&server_addr, addr_size);
-    sendto(sockfd, &end, sizeof(int), 0, (struct sockaddr*)&server_addr, addr_size);
 
     strcpy(buffer, REQ_FILE_PATH);
     sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&server_addr, addr_size);
@@ -72,11 +68,10 @@ void download_file(int sockfd, struct sockaddr_in server_addr, int start, int en
 
     bzero(buffer, 1024);
     int n_bytes = 0;
-    int remaining = end - start + 1;
-    while((n_bytes = recvfrom(sockfd, buffer, 1024 < remaining ? 1024 : remaining, 0, (struct sockaddr*)&server_addr, &addr_size)) > 0 && remaining > 0){
+    while((n_bytes = recvfrom(sockfd, buffer, 1024, 0, (struct sockaddr*)&server_addr, &addr_size)) > 0){
+        printf("[+]Received %d bytes\n", n_bytes);
         fwrite(buffer, 1, n_bytes, received_file);
         bzero(buffer, 1024);
-        remaining -= n_bytes;
         if (n_bytes == 0 || n_bytes != 1024){
             break;
         }

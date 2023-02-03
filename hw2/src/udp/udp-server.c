@@ -98,14 +98,11 @@ void transfer_file(int sockfd, struct sockaddr_in client_addr){
     char file_path[1024];
     socklen_t addr_size;
     addr_size = sizeof(client_addr);
-    int start, end;
 
     bzero(file_path, 1024);
     recvfrom(sockfd, file_path, 1024, 0, (struct sockaddr*)&client_addr, &addr_size);
-    recvfrom(sockfd, &start, sizeof(int), 0, (struct sockaddr*)&client_addr, &addr_size);
-    recvfrom(sockfd, &end, sizeof(int), 0, (struct sockaddr*)&client_addr, &addr_size);
 
-    printf("[+]Requested file path from %s: %s, start: %d, end: %d\n", inet_ntoa(client_addr.sin_addr), file_path, start, end);
+    printf("[+]Requested file path from %s: %s\n", inet_ntoa(client_addr.sin_addr), file_path);
     fflush(stdout);
 
     FILE *requested_file = fopen(file_path, "rb");
@@ -117,20 +114,9 @@ void transfer_file(int sockfd, struct sockaddr_in client_addr){
         return;
     }
 
-    fseek(requested_file, start, SEEK_END);
-    int file_size = ftell(requested_file);
-    fseek(requested_file, start, SEEK_SET);
-    printf("[+]File size: %d\n", file_size);
-    fflush(stdout);
-
-    if (end == -1) {
-      end = file_size - 1;
-    }
-
     bzero(buffer, 1024);
     int n_bytes = 0;
-    int remaining = end - start + 1;
-    while((n_bytes = fread(buffer, 1, 1024 < remaining ? 1024 : remaining, requested_file)) > 0 && remaining > 0){
+    while((n_bytes = fread(buffer, 1, 1024, requested_file)) > 0){
         int bytes_sent = 0;
         while(bytes_sent < n_bytes){
             int sent = sendto(sockfd, buffer + bytes_sent, n_bytes - bytes_sent, 0, (struct sockaddr*)&client_addr, addr_size);
@@ -143,12 +129,10 @@ void transfer_file(int sockfd, struct sockaddr_in client_addr){
             bytes_sent += sent;
         }
         bzero(buffer, 1024);
-        remaining -= n_bytes;
     }
 
     fclose(requested_file);
     printf("[+]File transfer complete\n");
     fflush(stdout);
 }
-
 

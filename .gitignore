@@ -5,3 +5,4 @@ vodserver
 udp-server
 udp-client
 *.dSYM
+*.ogg

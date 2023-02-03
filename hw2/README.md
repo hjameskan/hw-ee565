@@ -21,6 +21,19 @@ Then, navigate to:
 http://localhost:8345/          # will display hello world
 http://localhost:8345/video/video.webm     # will play a webm video
 ```
+<br />
+
+# Test UDP Locally
+## Use two terminal windows: ##
+
+In terminal 1 (This is the server)
+```
+make clean-server && make run-server
+```
+In termianl 2 (This is the client)
+```
+make clean-client && make run-client
+```
 
 
 <br />

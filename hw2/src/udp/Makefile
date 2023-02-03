@@ -7,7 +7,7 @@ hostname = 127.0.0.1
 endif
 
 CC=gcc
-CFLAGS=-Wall -g
+CFLAGS= -pthread -Wall -g
 
 all: udp-server udp-client
 

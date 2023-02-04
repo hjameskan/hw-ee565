@@ -8,16 +8,18 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <time.h>
+#include <sys/stat.h>
+#include "hashmap.h"
 
 #define MAX_CONNECTIONS 10
 #define MAX_SEQ_NO 30
 #define WINDOW_SIZE 10
 #define MAX_DATA_LEN 20
 #define PACKET_DATA_SIZE 1024
-#define HEADER_SIZE 12
+#define HEADER_SIZE 28
 
 void *connection_handler(void *socket_desc);
-void transfer_file(int sockfd, struct sockaddr_in client_addr);
+void transfer_file(int sockfd, struct sockaddr_in client_addr, char* filepath);
 int min(int a, int b);
 
 
@@ -29,6 +31,12 @@ int main(int argc, char **argv){
   }
   
   printf("UDP server with PID %d\n", getpid());
+  struct HashMap *map = hashmap_new();
+  // hashmap_put(map, "hello", "asdf");
+  // hashmap_put(map, "world", "asdfgg");
+  // printf("%s\n", hashmap_get(map, "hello")); // prints asdf
+  // printf("%s\n", hashmap_get(map, "world")); // prints asdfgg
+  hashmap_free(map);
   fflush(stdout);
 
   int port = atoi(argv[1]);
@@ -81,17 +89,69 @@ int main(int argc, char **argv){
   return 0;
 }
 
+typedef struct {
+    char packet_type[16]; // "ack" "fin" "syn" "synack" "put"
+    int packet_number;
+    int ack;
+    int packet_data_size;
+    char packet_data[PACKET_DATA_SIZE];
+} Packet;
+
 void *connection_handler(void *socket_desc){
   int sockfd = *(int*)socket_desc;
-  char buffer[1024];
+  // char buffer[1024];
+  Packet packet;
   struct sockaddr_in client_addr;
   socklen_t addr_size;
 
   addr_size = sizeof(client_addr);
-  bzero(buffer, 1024);
-  recvfrom(sockfd, buffer, 1024, 0, (struct sockaddr*)&client_addr, &addr_size);
-  if (strncmp(buffer, "transfer_file", strlen("transfer_file")) == 0) {
-    transfer_file(sockfd, client_addr);
+  // bzero(buffer, 1024);
+  bzero((char*) &packet, sizeof(packet));
+  recvfrom(sockfd, (char*) &packet, sizeof(packet), 0, (struct sockaddr*)&client_addr, &addr_size);
+  if (strncmp(packet.packet_type, "syn", strlen("syn")) == 0) {
+    char* filepath = packet.packet_data;
+    
+    // get file size from filepath
+    struct stat st;
+    if (stat(filepath, &st) == -1) {
+      perror("stat");
+      return 1;
+    }
+    int file_size = st.st_size;
+
+    // send synack here
+    int retries = 0;
+    while(1){
+      // init synack packet
+      bzero((char*) &packet, sizeof(packet));
+      strcpy(packet.packet_type, "synack");
+      packet.packet_number = 0;
+      packet.ack = 0;
+      packet.packet_data_size = PACKET_DATA_SIZE;
+      strcpy(packet.packet_data, file_size);
+      
+      sendto(sockfd, (char*) &packet, sizeof(packet), 0, (struct sockaddr*)&client_addr, addr_size);
+      bzero((char*) &packet, sizeof(packet));
+      
+      retries += 1;
+      if (retries > 5) {
+        printf("[-]Too many retries, aborting connection\n");
+        fflush(stdout);
+        break;
+      }
+
+      // wait for ack 0 here
+      int ret = recvfrom_timeout(sockfd, (char*) &packet, sizeof(packet), 0, (struct sockaddr*)&client_addr, &addr_size, 1);
+      if (strncmp(packet.packet_type, "ack", strlen("ack")) == 0 && packet.packet_number == 0) {
+        printf("[+]Data recv from %s: %s\n", inet_ntoa(client_addr.sin_addr), packet.packet_data);
+        fflush(stdout);
+
+        // send file here
+        transfer_file(sockfd, client_addr, filepath);
+        break;
+      }
+    }
+
   }
   // else {
   //   printf("[+]Data recv from %s: %s\n", inet_ntoa(client_addr.sin_addr), buffer);
@@ -105,26 +165,21 @@ void *connection_handler(void *socket_desc){
   return 0;
 }
 
-typedef struct {
-    int packet_number;
-    int ack;
-    int packet_data_size;
-    char packet_data[PACKET_DATA_SIZE];
-} Packet;
-
-void transfer_file(int sockfd, struct sockaddr_in client_addr){
+void transfer_file(int sockfd, struct sockaddr_in client_addr, char* filepath){
     char buffer[1024];
-    char file_path[1024];
+    // char file_path[1024];
     socklen_t addr_size;
     addr_size = sizeof(client_addr);
 
-    bzero(file_path, 1024);
-    recvfrom(sockfd, file_path, 1024, 0, (struct sockaddr*)&client_addr, &addr_size);
+    // wait for ack 0 here
 
-    printf("[+]Requested file path from %s: %s\n", inet_ntoa(client_addr.sin_addr), file_path);
+    // bzero(file_path, 1024);
+    // recvfrom(sockfd, file_path, 1024, 0, (struct sockaddr*)&client_addr, &addr_size);
+
+    printf("[+]Requested file path from %s: %s\n", inet_ntoa(client_addr.sin_addr), filepath);
     fflush(stdout);
 
-    FILE *requested_file = fopen(file_path, "rb");
+    FILE *requested_file = fopen(filepath, "rb");
     if(requested_file == NULL){
         strcpy(buffer, "File not found\n");
         sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&client_addr, addr_size);
@@ -134,7 +189,7 @@ void transfer_file(int sockfd, struct sockaddr_in client_addr){
     }
 
     Packet packet;
-    int packet_number = 1;
+    int packet_number = 0;
     int n_bytes = 0;
     while((n_bytes = fread(packet.packet_data, 1, PACKET_DATA_SIZE, requested_file)) > 0){
         packet.packet_number = packet_number;
@@ -175,3 +230,23 @@ int min(int a, int b){
     return a < b ? a : b;
 }
 
+int recvfrom_timeout(int sockfd, void *buf, size_t len, int flags,
+                     struct sockaddr *src_addr, socklen_t *addrlen, int timeout) {
+  fd_set readfds;
+  struct timeval tv;
+
+  FD_ZERO(&readfds);
+  FD_SET(sockfd, &readfds);
+
+  tv.tv_sec = timeout;
+  tv.tv_usec = 0;
+
+  int result = select(sockfd + 1, &readfds, NULL, NULL, &tv);
+  if (result == 0) {
+    return 0; // timeout
+  } else if (result == -1) {
+    return -1; // error
+  }
+
+  return recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+}

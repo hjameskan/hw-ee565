@@ -3,6 +3,8 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/select.h>
+#include <unistd.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
@@ -13,8 +15,10 @@
 
 // void download_file(int sockfd, struct sockaddr_in server_addr, int start, int end);
 void download_file(int sockfd, struct sockaddr_in server_addr);
+int recvfrom_timeout(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen, int timeout);
 
 typedef struct {
+    char packet_type[16]; // "ack" "fin" "syn" "synack" "put"
     int packet_number;
     int ack;
     int packet_data_size;
@@ -44,17 +48,6 @@ int main(int argc, char **argv){
   addr.sin_port = htons(port);
   addr.sin_addr.s_addr = inet_addr(ip);
 
-  // bzero(buffer, 1024);
-  // strcpy(buffer, "Hello, World!");
-  // sendto(sockfd, buffer, 1024, 0, (struct sockaddr*)&addr, sizeof(addr));
-  // printf("[+]Data send: %s\n", buffer);
-
-  // bzero(buffer, 1024);
-  // addr_size = sizeof(addr);
-  // recvfrom(sockfd, buffer, 1024, 0, (struct sockaddr*)&addr, &addr_size);
-  // printf("[+]Data recv: %s\n", buffer);
-
-  // download_file(sockfd, addr, 0, 10000);
   download_file(sockfd, addr);
 
   return 0;
@@ -73,37 +66,98 @@ void download_file(int sockfd, struct sockaddr_in server_addr){
         return;
     }
     
-    strcpy(buffer, "transfer_file");
-    sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&server_addr, addr_size);
+    // strcpy(buffer, "transfer_file");
+    Packet packet = {"syn", 0, 0, 0, REQ_FILE_PATH};
 
-    strcpy(buffer, REQ_FILE_PATH);
-    sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&server_addr, addr_size);
+    // strcpy(buffer, REQ_FILE_PATH);
+    // sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&server_addr, addr_size);
 
-    // send the start and end positions to the server
-    // sendto(sockfd, &start, sizeof(start), 0, (struct sockaddr*)&server_addr, addr_size);
-    // sendto(sockfd, &end, sizeof(end), 0, (struct sockaddr*)&server_addr, addr_size);
+    // send syn, then wait for synack
+    int retries = 0;
+    while (1) {
+        sendto(sockfd, (char*) &packet, sizeof(packet), 0, (struct sockaddr*)&server_addr, addr_size);
+        int ret = recvfrom_timeout(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr*)&server_addr, &addr_size, 1);
+        if (ret == 0) {
+            printf("[-] Timeout, resend syn\n");
+            fflush(stdout);
+            retries += 1;
+            continue;
+        } else if (ret == -1 || retries > 5) {
+            printf("[-] Error\n");
+            fflush(stdout);
+            return;
+        } else {
+            printf("[+] Received synack\n");
+            fflush(stdout);
+            break; // break out of loop when synack is received to receive file
+        }
+    }
 
-
-    Packet packet;
+    // Packet packet;
     bzero(packet.packet_data, PACKET_DATA_SIZE);
     int n_bytes = 0;
     int packet_number = 0;
-    while((n_bytes = recvfrom(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr*)&server_addr, &addr_size)) > 0){
-        packet_number++;
-        // printf("[+]Received packet %d of size %d bytes\n", packet.packet_number, packet.packet_data_size);
-        if(packet.packet_number != packet_number){
-            printf("[-] Packet number mismatch: actual is %d, expected is %d\n", packet.packet_number, packet_number);
-            fflush(stdout);
-            break;
-        }
-        fwrite(packet.packet_data, 1, packet.packet_data_size, received_file);
-        bzero(packet.packet_data, PACKET_DATA_SIZE);
-        if (packet.packet_data_size < PACKET_DATA_SIZE){
-            break;
-        }
-    }
+
+    // make this loop send out acks then wait for the next packet
+    // while(1){
+    //     // send ack
+    //     packet.packet_number = packet_number;
+    //     strcpy(packet.packet_type, "ack");
+    //     int sent = sendto(sockfd, (char*) &packet, sizeof(packet), 0, (struct sockaddr*)&server_addr, addr_size);
+    //     if (sent == -1) {
+    //         printf("[-] Error\n");
+    //         fflush(stdout);
+    //         return;
+    //     }
+
+    //     // wait for packet
+    //     n_bytes = recvfrom_timeout(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr*)&server_addr, &addr_size, 1);
+    //     if (n_bytes == 0) {
+    //         printf("[-] Timeout, resend ack\n");
+    //         fflush(stdout);
+    //         continue;
+    //     } else if (n_bytes == -1) {
+    //         printf("[-] Error\n");
+    //         fflush(stdout);
+    //         return;
+    //     } else {
+    //         printf("[+] Received packet %d of size %d bytes\n", packet.packet_number, packet.packet_data_size);
+    //         fflush(stdout);
+    //         if(packet.packet_number != packet_number){
+    //             printf("[-] Packet number mismatch: actual is %d, expected is %d\n", packet.packet_number, packet_number);
+    //             fflush(stdout);
+    //             break;
+    //         }
+    //         fwrite(packet.packet_data, 1, packet.packet_data_size, received_file);
+    //         bzero(packet.packet_data, PACKET_DATA_SIZE);
+    //         if (packet.packet_data_size < PACKET_DATA_SIZE){
+    //             break;
+    //         }
+    //         packet_number++;
+    //     }
+    // }
 
     fclose(received_file);
     printf("[+]File transfer complete\n");
     fflush(stdout);
+}
+
+int recvfrom_timeout(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen, int timeout) {
+  fd_set readfds;
+  struct timeval tv;
+
+  FD_ZERO(&readfds);
+  FD_SET(sockfd, &readfds);
+
+  tv.tv_sec = timeout;
+  tv.tv_usec = 0;
+
+  int result = select(sockfd + 1, &readfds, NULL, NULL, &tv);
+  if (result == 0) {
+    return 0; // timeout
+  } else if (result == -1) {
+    return -1; // error
+  }
+
+  return recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
 }

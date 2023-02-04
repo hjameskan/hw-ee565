@@ -13,4 +13,4 @@ services:
     # we need this to access the host's network
     # because we need to access the host's IP
     # more complications arise otherwise in different OSes
-    # network_mode: "host"
+    network_mode: "host"

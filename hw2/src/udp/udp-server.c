@@ -3,26 +3,41 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/syscall.h>
+#include <pthread.h>
+#include <sys/stat.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <time.h>
-#include <sys/stat.h>
 #include "hashmap.h"
 
-#define MAX_CONNECTIONS 10
+#define MAX_CONNECTIONS 1
 #define MAX_SEQ_NO 30
 #define WINDOW_SIZE 10
 #define MAX_DATA_LEN 20
 #define PACKET_DATA_SIZE 1024
-#define HEADER_SIZE 28
+#define HEADER_SIZE 319
+
+typedef struct {
+  char connection_id[27]; // IP + tid
+  char packet_type[16]; // "ack" "fin" "syn" "synack" "put"
+  int ack_number;
+  char file_path[256];
+  int start_byte;
+  int end_byte; // not yet implemented
+  int packet_number;
+  int packet_data_size;
+  char packet_data[PACKET_DATA_SIZE];
+} Packet;
 
 void *connection_handler(void *socket_desc);
-void transfer_file(int sockfd, struct sockaddr_in client_addr, char* filepath);
-int min(int a, int b);
-
-
+void routing_handler(void *socket_desc, struct sockaddr_in client_addr, Packet *input_packet);
+void transfer_file(int sockfd, struct sockaddr_in client_addr, Packet* packet);
+int recvfrom_timeout(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen, int timeout);
+void duplicate_packet(Packet *packet1, Packet *packet2);
+void printf_packet(Packet *packet, char* text);
 
 int main(int argc, char **argv){
   if (argc != 2){
@@ -31,12 +46,6 @@ int main(int argc, char **argv){
   }
   
   printf("UDP server with PID %d\n", getpid());
-  struct HashMap *map = hashmap_new();
-  // hashmap_put(map, "hello", "asdf");
-  // hashmap_put(map, "world", "asdfgg");
-  // printf("%s\n", hashmap_get(map, "hello")); // prints asdf
-  // printf("%s\n", hashmap_get(map, "world")); // prints asdfgg
-  hashmap_free(map);
   fflush(stdout);
 
   int port = atoi(argv[1]);
@@ -89,94 +98,89 @@ int main(int argc, char **argv){
   return 0;
 }
 
-typedef struct {
-    char packet_type[16]; // "ack" "fin" "syn" "synack" "put"
-    int packet_number;
-    int ack;
-    int packet_data_size;
-    char packet_data[PACKET_DATA_SIZE];
-} Packet;
-
 void *connection_handler(void *socket_desc){
   int sockfd = *(int*)socket_desc;
-  // char buffer[1024];
-  Packet packet;
   struct sockaddr_in client_addr;
   socklen_t addr_size;
 
   addr_size = sizeof(client_addr);
-  // bzero(buffer, 1024);
-  bzero((char*) &packet, sizeof(packet));
-  recvfrom(sockfd, (char*) &packet, sizeof(packet), 0, (struct sockaddr*)&client_addr, &addr_size);
-  if (strncmp(packet.packet_type, "syn", strlen("syn")) == 0) {
-    char* filepath = packet.packet_data;
+
+  while(1) {
+    Packet packet;
+    int ret = recvfrom_timeout(sockfd, (char*) &packet, sizeof(packet), 0, (struct sockaddr*)&client_addr, &addr_size, 1);
+    if(ret == 0){
+      continue;
+    }
+    else if(ret == -1){
+      perror("[-]recvfrom error");
+      fflush(stdout);
+      return 0;
+    }
+    else{
+      // handle cases here
+      routing_handler(socket_desc, client_addr, &packet);
+    }
+  }
+  
+  free(socket_desc);
+  return 0;
+}
+
+void routing_handler(void *socket_desc, struct sockaddr_in client_addr, Packet *input_packet){
+  int sockfd = *(int*)socket_desc;
+  
+  socklen_t addr_size;
+  addr_size = sizeof(client_addr);
+
+  if (strncmp(input_packet->packet_type, "syn", strlen("syn")) == 0) {
+    char* filepath = input_packet->packet_data;
     
     // get file size from filepath
     struct stat st;
     if (stat(filepath, &st) == -1) {
       perror("stat");
-      return 1;
+      return;
     }
     int file_size = st.st_size;
+    fflush(stdout);
+
+    // init output_packet
+    Packet output_packet;
+    duplicate_packet(&output_packet, input_packet);
 
     // send synack here
-    int retries = 0;
-    while(1){
-      // init synack packet
-      bzero((char*) &packet, sizeof(packet));
-      strcpy(packet.packet_type, "synack");
-      packet.packet_number = 0;
-      packet.ack = 0;
-      packet.packet_data_size = PACKET_DATA_SIZE;
-      strcpy(packet.packet_data, file_size);
-      
-      sendto(sockfd, (char*) &packet, sizeof(packet), 0, (struct sockaddr*)&client_addr, addr_size);
-      bzero((char*) &packet, sizeof(packet));
-      
-      retries += 1;
-      if (retries > 5) {
-        printf("[-]Too many retries, aborting connection\n");
-        fflush(stdout);
-        break;
-      }
+    strcpy(output_packet.packet_type, "synack");
+    sprintf(output_packet.packet_data, "%d", file_size);
 
-      // wait for ack 0 here
-      int ret = recvfrom_timeout(sockfd, (char*) &packet, sizeof(packet), 0, (struct sockaddr*)&client_addr, &addr_size, 1);
-      if (strncmp(packet.packet_type, "ack", strlen("ack")) == 0 && packet.packet_number == 0) {
-        printf("[+]Data recv from %s: %s\n", inet_ntoa(client_addr.sin_addr), packet.packet_data);
-        fflush(stdout);
+    printf("file size: %d bytes (%d KB) written as %s\n" , file_size, file_size / 1024, output_packet.packet_data);
 
-        // send file here
-        transfer_file(sockfd, client_addr, filepath);
-        break;
-      }
+    int n = sendto(sockfd, (char*) &output_packet, sizeof(Packet), 0, (struct sockaddr*)&client_addr, addr_size);
+    if (n < 0) {
+      perror("[-]sendto error");
+      exit(1);
     }
-
   }
-  // else {
-  //   printf("[+]Data recv from %s: %s\n", inet_ntoa(client_addr.sin_addr), buffer);
-  //   fflush(stdout);
-  //   sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&client_addr, addr_size);
-  //   printf("[+]Data sent to %s: %s\n", inet_ntoa(client_addr.sin_addr), buffer);
-  //   fflush(stdout);
-  // }
-
-  free(socket_desc);
-  return 0;
+  else if(strncmp(input_packet->packet_type, "ack", strlen("ack")) == 0){
+    // send file here
+    transfer_file(sockfd, client_addr, input_packet);
+  }
+  else if(strncmp(input_packet->packet_type, "fin", strlen("fin")) == 0){
+    // do nothing
+  }
+  else {
+    printf("[-]Invalid packet type\n");
+    printf("packet type: %s\n", input_packet->packet_type);
+    fflush(stdout);
+  }
+  return;
 }
 
-void transfer_file(int sockfd, struct sockaddr_in client_addr, char* filepath){
+void transfer_file(int sockfd, struct sockaddr_in client_addr, Packet* input_packet){
     char buffer[1024];
-    // char file_path[1024];
     socklen_t addr_size;
     addr_size = sizeof(client_addr);
 
-    // wait for ack 0 here
-
-    // bzero(file_path, 1024);
-    // recvfrom(sockfd, file_path, 1024, 0, (struct sockaddr*)&client_addr, &addr_size);
-
-    printf("[+]Requested file path from %s: %s\n", inet_ntoa(client_addr.sin_addr), filepath);
+    char* filepath = input_packet->file_path;
     fflush(stdout);
 
     FILE *requested_file = fopen(filepath, "rb");
@@ -187,51 +191,44 @@ void transfer_file(int sockfd, struct sockaddr_in client_addr, char* filepath){
         fflush(stdout);
         return;
     }
-
-    Packet packet;
-    int packet_number = 0;
-    int n_bytes = 0;
-    while((n_bytes = fread(packet.packet_data, 1, PACKET_DATA_SIZE, requested_file)) > 0){
-        packet.packet_number = packet_number;
-        packet.packet_data_size = n_bytes;
-        int size = sizeof(packet);
-        printf("[+]Sending packet %d of size %d\n", packet_number, n_bytes);
-
-        int bytes_sent = 0;
-        while(bytes_sent < HEADER_SIZE + n_bytes){
-            int sent = sendto(sockfd, (char*) &packet + bytes_sent, HEADER_SIZE + n_bytes - bytes_sent, 0, (struct sockaddr*)&client_addr, addr_size);
-            if (sent < 0){
-                printf("[-]Failed to send data\n");
-                fflush(stdout);
-                fclose(requested_file);
-                return;
-            }
-            bytes_sent += sent;
-
-            struct timespec sleepTime;
-            sleepTime.tv_sec = 0;
-            sleepTime.tv_nsec = 1000000; // 1 milliseconds = 1,000,000 nanoseconds
-            nanosleep(&sleepTime, NULL);
-        }
-
-        packet_number++;
-        printf("packet size: %d\n", sizeof(packet));
-        bzero((char*) &packet, sizeof(packet));
+    
+    int start_position = input_packet->start_byte;
+    if (fseek(requested_file, start_position, SEEK_SET) != 0) {
+        perror("Error seeking in file");
+        fclose(requested_file);
+        return;
     }
 
+    // send 1 packet
+    Packet output_packet;
+    duplicate_packet(&output_packet, input_packet);
+    int packet_number = 0;
+    int n_bytes = fread(output_packet.packet_data, 1, PACKET_DATA_SIZE, requested_file);
+    output_packet.packet_number = input_packet->ack_number;
+    output_packet.packet_data_size = n_bytes;
+    if (n_bytes > 0) {
+        int size = sizeof(output_packet);
+        printf("[+]Sending packet %d of size %d\n", output_packet.packet_number, n_bytes);
+
+        int bytes_sent = 0;
+        int sent = sendto(sockfd, (char*) &output_packet, sizeof(Packet), 0, (struct sockaddr*)&client_addr, addr_size);
+        if (sent < 0){
+            printf("[-]Failed to send data\n");
+            fflush(stdout);
+            fclose(requested_file);
+            return;
+        }
+        bytes_sent += sent;
+
+        packet_number++;
+    }
+    bzero((char*) &output_packet, sizeof(output_packet));
+
     fclose(requested_file);
-    printf("[+]File transfer complete\n");
     fflush(stdout);
 }
 
-        // bzero((char*) &packet, HEADER_SIZE + PACKET_SIZE);
-
-int min(int a, int b){
-    return a < b ? a : b;
-}
-
-int recvfrom_timeout(int sockfd, void *buf, size_t len, int flags,
-                     struct sockaddr *src_addr, socklen_t *addrlen, int timeout) {
+int recvfrom_timeout(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen, int timeout) {
   fd_set readfds;
   struct timeval tv;
 
@@ -249,4 +246,36 @@ int recvfrom_timeout(int sockfd, void *buf, size_t len, int flags,
   }
 
   return recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+}
+
+void duplicate_packet(Packet *packet1, Packet *packet2) {
+    packet1->packet_number = packet2->packet_number;
+    packet1->ack_number = packet2->ack_number;
+    packet1->start_byte = packet2->start_byte;
+    packet1->end_byte = packet2->end_byte;
+    packet1->packet_data_size = packet2->packet_data_size;
+    strcpy(packet1->packet_type, packet2->packet_type);
+    strcpy(packet1->connection_id, packet2->connection_id);
+    strcpy(packet1->file_path, packet2->file_path);
+}
+
+void printf_packet(Packet *packet, char* text) {
+    if (text == NULL){
+      text = "";
+    }
+
+    printf("\n");
+    printf("====================== This is the packet ======================\n");
+    printf("====================== %s ======================\n", text);
+    printf("packet_number: %d\n", packet->packet_number);
+    printf("ack_number: %d\n", packet->ack_number); 
+    printf("start_byte: %d\n", packet->start_byte);
+    printf("end_byte: %d\n", packet->end_byte);
+    printf("packet_data_size: %d\n", packet->packet_data_size);
+    printf("packet_type: %s\n", packet->packet_type);
+    printf("connection_id: %s\n", packet->connection_id);
+    printf("file_path: %s\n", packet->file_path);
+    printf("tid: %d\n", pthread_self());
+    printf("\n");
+    fflush(stdout);
 }

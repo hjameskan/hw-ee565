@@ -10,3 +10,5 @@ udp-client
 *.txt
 udp-server3.c
 udp-client3.c
+udp-server.o
+udp-client.o

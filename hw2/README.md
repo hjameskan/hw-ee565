@@ -1,6 +1,6 @@
 # Instruction to Start Server
 
-Design doc location: https://docs.google.com/document/d/1TXFtoXJwDS0cmcqsKqL0H-cUqX7ZJrGzrEKIrFhsiCY/edit?usp=sharing
+Design doc location: https://docs.google.com/document/d/1b0SBqkKJE1qmtRREZKgodh0Je9-gSnYsvsK3gTl_gVQ/edit?usp=sharing
 
 Go to the directory: `hw2`, execute one of the follwoing:
 

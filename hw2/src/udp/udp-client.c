@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -8,7 +9,7 @@
 
 #define IP_ADDRESS "127.0.0.1"
 #define REQ_FILE_PATH "sample4.ogg"
-#define RECV_FILE_PATH "sample4_recv.ogg"
+#define RECV_FILE_PATH "sample4_recv.ogg" // add time stamp
 
 void download_file(int sockfd, struct sockaddr_in server_addr);
 
@@ -51,6 +52,8 @@ int main(int argc, char **argv){
 void download_file(int sockfd, struct sockaddr_in server_addr){
     char buffer[1024];
     socklen_t addr_size;
+    char arr[256];
+    struct timeval tv;
     addr_size = sizeof(server_addr);
 
     strcpy(buffer, "transfer_file");
@@ -58,8 +61,17 @@ void download_file(int sockfd, struct sockaddr_in server_addr){
     
     strcpy(buffer, REQ_FILE_PATH);
     sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&server_addr, addr_size);
+    
 
-    FILE *received_file = fopen(RECV_FILE_PATH, "wb");
+    gettimeofday(&tv,NULL);
+    
+    char arr4[256];
+    sprintf(arr4,"sample4_recv %ld.ogg", tv.tv_sec);
+    printf(arr4);
+    char arr2[256];
+    sprintf(arr2,"1234%ld",tv.tv_sec);
+    // char *arr3 =strcat(RECV_FILE_PATH, arr2);
+    FILE *received_file = fopen(arr4, "wb");
     if(received_file == NULL){
         printf("[-]File creation failed\n");
         fflush(stdout);

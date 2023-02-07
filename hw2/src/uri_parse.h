@@ -6,7 +6,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-
+struct add_info {
+    char *path;
+    char *host;
+    int port;
+    int rate;
+    struct add_info *next;
+} add_info;
 
 // inputs
 //      -  request => pointer to a copy of the receive buffer contents (containing the
@@ -33,6 +39,8 @@ int content_type_lookup(char *content_type, char *filetype);
 int is_peer_path(char *path_string) ;
 
 
+void add_peer_to_list(const char *path, const char *host, int port, int rate);
+void send_peer_list(const char *content_path, int connect_fd);
 void process_peer_path(char *path_string, int connect_fd);
 
 

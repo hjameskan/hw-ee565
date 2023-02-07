@@ -1,5 +1,12 @@
 #include "uri_parse.h"
 #include "http_utils.h"
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 // HTTP Processing functions
 void process_startline(char *request, char **method, char **path, char **version) {
@@ -82,6 +89,93 @@ int content_type_lookup(char *content_type, char *filetype) {
 //    return (strcmp(first_token, "peer") == 0);
 //}
 
+
+
+struct add_info *head = NULL;
+int peer_rate = 0;
+char peer_status[100] = {0};
+
+int connect_to_peer(char *host, int port) {
+    int sockfd;
+    struct sockaddr_in serv_addr;
+
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        printf("Failed to create socket\n");
+        return -1;
+    }
+
+    memset(&serv_addr, 0, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(port);
+
+    if (inet_pton(AF_INET, host, &serv_addr.sin_addr) <= 0) {
+        printf("Failed to convert IP address\n");
+        return -1;
+    }
+
+    if (connect(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+        printf("Failed to connect to peer\n");
+        return -1;
+    }
+
+    return sockfd;
+}
+
+void send_http_500(int connect_fd) {
+    char *response = "HTTP/1.1 500 Internal Server Error\r\n\r\n";
+    int response_len = strlen(response);
+
+    if (send(connect_fd, response, response_len, 0) != response_len) {
+        printf("Failed to send HTTP 500 response\n");
+    }
+}
+
+
+
+void add_peer_to_list(const char *path, const char *host, int port, int rate) {
+  struct add_info *new_peer = (struct add_info *)malloc(sizeof(struct add_info));
+  strcpy(new_peer->path, path);
+  strcpy(new_peer->host, host);
+  new_peer->port = port;
+  new_peer->rate = rate;
+  new_peer->next = NULL;
+
+  if (head == NULL) {
+    head = new_peer;
+  } else {
+    struct add_info *current = head;
+    while (current->next != NULL) {
+      current = current->next;
+    }
+    current->next = new_peer;
+  }
+}
+
+
+
+void send_peer_list(const char *content_path, int connect_fd) {
+  // Here's an example peer list, you'll need to replace this with your actual peer list
+
+  int num_peers = sizeof(head) / sizeof(struct add_info);
+
+  for (int i = 0; i < num_peers; i++) {
+    // Check if the peer is serving the content we're interested in
+    if (strcmp(head[i].path, content_path) == 0) {
+      char message[256];
+      sprintf(message, "%s %s %d %d", head[i].path, head[i].host, head[i].port, head[i].rate);
+      send(connect_fd, message, strlen(message), 0);
+    }
+  }
+}
+
+int get_peer_status() {
+    // This function retrieves the current status of a peer
+    // and returns 0 if the peer is healthy, or a non-zero value if there is an issue
+
+    // For example:
+    return 0;
+}
+
 void process_peer_path(char *path_string, int connect_fd) {
 
     char *rest = path_string;
@@ -98,12 +192,7 @@ void process_peer_path(char *path_string, int connect_fd) {
 
     if      (strcmp(peer_cmd, "add"    ) == 0) {
         printf("/peer/add parsed!\n");
-        struct add_info {
-            char *path;
-            char *host;
-            int port;
-            int rate;
-        } add_info;
+
 
         memset(&add_info, 0, sizeof(struct add_info)); // clear out struct contents... maybe
 
@@ -146,6 +235,7 @@ void process_peer_path(char *path_string, int connect_fd) {
         // ********************************
         // PERFORM /PEER/ADD work here
         // ********************************
+        add_peer_to_list(add_info.path, add_info.host, add_info.port, add_info.rate);
 
         send_http_200(connect_fd);
         exit(0);
@@ -159,6 +249,7 @@ void process_peer_path(char *path_string, int connect_fd) {
         // ********************************
         // PERFORM /PEER/VIEW work here
         // ********************************
+        send_peer_list(content_path, connect_fd);
 
         send_http_200(connect_fd); // note: for now we will send a 200 response
         exit(0);                   // but later, we will need to provide requested content
@@ -184,8 +275,43 @@ void process_peer_path(char *path_string, int connect_fd) {
         // ********************************
         // PERFORM /PEER/CONFIG work here
         // ********************************
+        // 1. Prepare a message to send to a remote peer
+        char message[100];
+        sprintf(message, "Configuring rate to %d\n", rate);
 
+        // 2. Connect to the remote peer
+        int sock_fd = connect_to_peer(add_info.host, add_info.port);
+        if (sock_fd == -1) {
+            printf("Failed to connect to peer\n");
+            send_http_500(connect_fd);
+            exit(1);
+        }
+
+        // 3. Send the message to the remote peer
+        int num_sent = send(sock_fd, message, strlen(message), 0);
+        if (num_sent == -1) {
+            printf("Failed to send message\n");
+            send_http_500(connect_fd);
+            exit(1);
+        }
+
+        // 4. Receive a response from the remote peer
+        char response[100];
+        int num_received = recv(sock_fd, response, 100, 0);
+        if (num_received == -1) {
+            printf("Failed to receive response\n");
+            send_http_500(connect_fd);
+            exit(1);
+        }
+
+        // 5. Log the response from the remote peer
+        printf("Response from peer: %s\n", response);
+
+        // 6. Send an HTTP 200 response to the client
         send_http_200(connect_fd);
+
+        // 7. Close the connection to the remote peer
+        close(sock_fd);
         exit(0);
     }
     else if (strcmp(peer_cmd, "status" ) == 0) {
@@ -194,8 +320,12 @@ void process_peer_path(char *path_string, int connect_fd) {
         // ********************************
         // PERFORM /PEER/STATUS work here
         // ********************************
-
-        send_http_200(connect_fd);
+        int peer_status = get_peer_status();
+        if (peer_status == 0) {
+            send_http_200(connect_fd);
+        } else {
+            send_http_500(connect_fd);
+        }
         exit(0);
     }
 

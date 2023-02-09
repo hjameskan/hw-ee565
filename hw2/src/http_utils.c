@@ -1,3 +1,6 @@
+#include <sys/socket.h>
+#include <unistd.h>
+#include <ctype.h>
 #include "http_utils.h"
 
 void generate_timestamp(char *buf) {

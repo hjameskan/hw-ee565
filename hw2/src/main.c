@@ -15,15 +15,20 @@
 #include <time.h>
 #include <ctype.h>
 #include <string.h>
+#include <pthread.h>
+
 
 #include "socket_utils.h"
 #include "http_utils.h"
 #include "uri_parse.h"
 
 #define BACKLOG 100   // how many pending connections queue will hold
+#define MAX_THREADS 100
+int new_fd;
+pthread_t threads[MAX_THREADS];
+int thread_index = 0;
 
-
-
+void *thread_routine(void *arg);
 void child_routine(int connect_fd);
 
 int main(int argc, char *argv[]) {
@@ -41,8 +46,6 @@ int main(int argc, char *argv[]) {
     }
 
     printf("Server started on port %s\n", port);
-
-    // START -- setup address information structures
 
     int sockfd, new_fd;  // listen on sock_fd, new connection on new_fd
     struct addrinfo hints, *servinfo, *p;
@@ -121,9 +124,6 @@ int main(int argc, char *argv[]) {
     // main accept() loop
     while(1) {
 
-        // store size of sockaddr_storage struct, this is the maximum
-        // amount of bytes placed into 'their_addr', and is set by 'accept'
-        // to the actual amount of updated bytes.
         sin_size = sizeof(their_addr);
 
         /// incoming connection information will populate 'their_addr'
@@ -138,8 +138,6 @@ int main(int argc, char *argv[]) {
             get_in_addr((struct sockaddr *)&their_addr),
             s, sizeof(s));
 
-        //printf("Server: got connection from %s\n", s);
-
         // spawn a child process to handle new connection
         pid_t pid = fork();
 
@@ -153,13 +151,36 @@ int main(int argc, char *argv[]) {
         close(new_fd);  // parent doesn't need this
     }
     return 0;
+
+    // while (1) {
+    //     printf("this is start\n");
+    //   sin_size = sizeof(their_addr);
+    //     printf("this is start2\n");
+    //   new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
+    //   printf("thread_index: %d\n", thread_index);
+
+    //   if (new_fd == -1) {
+    //      perror("accept");
+    //      continue;
+    //   }
+    //     printf("this is before the if case\n");
+
+    //   // create a new thread to handle the connection
+    //   if (thread_index < MAX_THREADS) {
+    //     printf("this is inside the if case\n");
+    //      pthread_create(&threads[thread_index], NULL, thread_routine, (void *)&new_fd);
+    //      ++thread_index;
+    //   } else {
+    //     printf("this is the else case\n");
+    //      // no more threads available, wait for an existing thread to finish
+    //      pthread_join(threads[thread_index % MAX_THREADS], NULL);
+    //      thread_index = 0;
+    //      pthread_create(&threads[thread_index % MAX_THREADS], NULL, thread_routine, (void *)&new_fd);
+    //   }
+    // }
+    // return 0;
 }
 
-
-// 'child_routine' is executed by all child processes to handle a
-// received HTTP request. this routine is responsible for locating
-// files and resources requested by the initial  HTTP request, and
-// responding appropriately with an HTTP response packet.
 void child_routine(int connect_fd) {
 
     // packet receive data buffer (from http request)
@@ -167,7 +188,6 @@ void child_routine(int connect_fd) {
     int numbytes;
     numbytes = recv(connect_fd, buffer, sizeof(buffer), 0);
     buffer[numbytes] = '\0'; // what if numbytes is 1024????
-
 
     // processing the HTTP start-line
     char *method, *path, *version; // start-line info
@@ -180,36 +200,20 @@ void child_routine(int connect_fd) {
     // using strtok to tokenize the request
     process_startline(request, &method, &path, &version);
 
-    printf("test me\n");
-
     char path_peer_copy[100];
     strncpy(path_peer_copy, path, sizeof(path_peer_copy));
 
     printf("init copy %s\n", path_peer_copy);
-    //int is_peer_req = is_peer_path(path_peer_copy);
-    //if (is_peer_path) {
-    //printf("LENGTH: %d\n", strlen(path_peer_copy));
     if (strlen(path_peer_copy) > 1) {
         process_peer_path(path_peer_copy, connect_fd);
+        printf("here-1\n");
     }
-    //}
-
-    //process_peer_path(path);
+    printf("here0\n");
 
     char pathstr[strlen(path) + 1];
 
     strcpy(pathstr, path);
-
-    //printf("[INFO] pathstr: %s, length: %d\n", pathstr, strlen(pathstr));
-    //printf("[INFO] method: %s, path: %s, version: %s \n\n", method, path, version);
-
-    /*if(strlen(path) > 1) {
-        // for a fully specified path, parse filename and filetype
-        parse_http_uri(path, &filename, &filetype);
-        printf("[INFO] filename: %s, filetype: %s\n", filename, filetype);
-    }*/
-
-
+    printf("here1\n");
     // -------------------------------------------
     // Standard HTTP request handling
     // -------------------------------------------
@@ -218,16 +222,13 @@ void child_routine(int connect_fd) {
         exit(0);
     }
 
-    // if the pathstr specifies actual content, further processing of the
-    // URI string is required
     parse_http_uri(path, &filename, &filetype);
-    //printf("[INFO] filename: %s, filetype: %s\n", filename, filetype);
+    printf("here2\n");
 
     char file_location[sizeof("/content") + sizeof(path)] = "./content";
     strcat(file_location, path);
     printf("file_location: %s\n", file_location);
-
-    //open(file_location, O_RDONLY);
+    printf("here3\n");
 
     if (access(file_location, F_OK) == 0) {
         // lookup the file's content type
@@ -238,25 +239,26 @@ void child_routine(int connect_fd) {
         transfer_file_chunk(buffer, file_location, connect_fd, content_type);
 
     } else {
+        // see if the file is in the peer's directory
+
+
+        // if not, send 404
         char* message = "HTTP/1.1 404 Not Found\r\n"
                         "Content-Type: text/html; charset=UTF-8\r\n\r\n"
                         "<html><body>404 Not Found</body></html>\r\n";
         send(connect_fd, message, strlen(message), 0);
     }
-
-
-    //printf("[INFO] filename: %s, filetype: %s\n", filename, filetype);
-
-    /*if (filename) {
-        printf("t1");
-        free(filename);
-    }
-
-    if (filetype) {
-        printf("t2");
-        free(filetype);
-    }*/
+    printf("here4\n");
 
     close(connect_fd);
     exit(0);
 }
+
+void *thread_routine(void *arg) {
+   int fd = *(int *)arg;
+   child_routine(fd);
+   pthread_exit(NULL);
+}
+
+
+

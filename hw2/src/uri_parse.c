@@ -1,5 +1,24 @@
 #include "uri_parse.h"
 #include "http_utils.h"
+#include <stddef.h>
+#include <stdlib.h>
+
+int peers_count = 0;
+struct peer_url {
+    char *path;
+    char *host;
+    char *port;
+    char *rate;
+};
+
+struct peer_url peers_list[100];
+
+void add_peer_to_list(struct peer_url peer);
+void print_peers_list();
+
+void ppp(struct peer_url *peer) {
+    printf("path: %s\n", peer->path);
+}
 
 // HTTP Processing functions
 void process_startline(char *request, char **method, char **path, char **version) {
@@ -7,7 +26,6 @@ void process_startline(char *request, char **method, char **path, char **version
     *path    = strtok(NULL, " ");
     *version = strtok(NULL, "\r\n");
 }
-
 
 void parse_http_uri(const char *path, char **filename, char **filetype) {
     // return filename and file extension type
@@ -83,7 +101,6 @@ int content_type_lookup(char *content_type, char *filetype) {
 //}
 
 void process_peer_path(char *path_string, int connect_fd) {
-
     char *rest = path_string;
     char *first_token = strtok_r(path_string, "/", &rest);
 
@@ -116,11 +133,6 @@ void process_peer_path(char *path_string, int connect_fd) {
             field_name = strtok_r(new_token, "=", &remainder);
             data = strtok_r(NULL, "=", &remainder);
 
-            //printf("field_name: %s\n", field_name);
-            //printf("data: %s\n", data);
-            //printf("-----------\n");
-
-
             if      (strcmp(field_name, "path" ) == 0) {
                 add_info.path = data;
             }
@@ -146,6 +158,17 @@ void process_peer_path(char *path_string, int connect_fd) {
         // ********************************
         // PERFORM /PEER/ADD work here
         // ********************************
+        struct peer_url peer;
+        peer.path = add_info.path;
+        peer.host = add_info.host;
+        char port[10] = {0};
+        sprintf(port, "%d", add_info.port);
+        peer.port = port;
+        char rate[10] = {0};
+        sprintf(rate, "%d", add_info.rate);
+        peer.rate = rate;
+        add_peer_to_list(peer);
+        print_peers_list();
 
         send_http_200(connect_fd);
         exit(0);
@@ -159,6 +182,7 @@ void process_peer_path(char *path_string, int connect_fd) {
         // ********************************
         // PERFORM /PEER/VIEW work here
         // ********************************
+        printf("sending 200 response \n");
 
         send_http_200(connect_fd); // note: for now we will send a 200 response
         exit(0);                   // but later, we will need to provide requested content
@@ -203,4 +227,21 @@ void process_peer_path(char *path_string, int connect_fd) {
 
 
     exit(0);
+}
+
+void add_peer_to_list(struct peer_url p) {
+    if (peers_count >= 100) {
+    return;
+    }
+    peers_list[peers_count] = p;
+    peers_count += 1;
+}
+
+void print_peers_list() {
+    printf("peers_count: %d\n", peers_count);
+    for (int i = 0; i < peers_count; i++) {
+        if (peers_list[i].path != NULL) {
+            printf("Peer %d: path=%s, host=%s, port=%s, rate=%s\n", i, peers_list[i].path, peers_list[i].host, peers_list[i].port, peers_list[i].rate);
+        }
+    }
 }

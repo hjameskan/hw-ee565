@@ -6,8 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-
-
 // inputs
 //      -  request => pointer to a copy of the receive buffer contents (containing the
 //      HTTP request)

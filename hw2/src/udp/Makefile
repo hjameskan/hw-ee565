@@ -11,8 +11,14 @@ CFLAGS= -pthread -Wall -g
 
 all: udp-server udp-client
 
-udp-server: udp-server.c
+udp-server: udp-server.o hashmap.o
 	$(CC) $(CFLAGS) -o $@ $^
+
+udp-server.o: udp-server.c
+	$(CC) $(CFLAGS) -c $<
+
+hashmap.o: hashmap.c
+	$(CC) $(CFLAGS) -c $<
 
 udp-client: udp-client.c
 	$(CC) $(CFLAGS) -o $@ $^
@@ -27,10 +33,10 @@ run-client: udp-client
 .PHONY: clean
 
 clean:
-	rm -f udp-server udp-client
+	rm -f udp-server udp-client hashmap.o udp-server.o
 
 clean-server:
-	rm -f udp-server
+	rm -f udp-server hashmap.o udp-server.o
 
 clean-client:
 	rm -f udp-client

@@ -6,3 +6,9 @@ udp-server
 udp-client
 *.dSYM
 *.ogg
+*.mkv
+*.txt
+udp-server3.c
+udp-client3.c
+udp-server.o
+udp-client.o

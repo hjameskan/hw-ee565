@@ -14,4 +14,4 @@ make clean
 make run
 # ./vodserver 8346
 
-pwd && ls -la
+# pwd && ls -la

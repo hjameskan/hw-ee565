@@ -1,68 +1,66 @@
-#include <stdio.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
-
 #include "hashmap.h"
 
-#define HASH_TABLE_SIZE 256
-
-// A simple hash function that takes a string and returns an index
 unsigned int hash(const char *str) {
-    unsigned int hash = 5381;
-    int c;
-    while ((c = *str++))
-        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
-    return hash % HASH_TABLE_SIZE;
+    unsigned int result = 0;
+    while (*str) {
+        result = result * 31 + *str++;
+    }
+    return result % HASH_TABLE_SIZE;
 }
 
-// Allocates a new hash map
 struct HashMap *hashmap_new() {
-    struct HashMap *map = malloc(sizeof(struct HashMap));
-    memset(map->entries, 0, sizeof(map->entries));
+    struct HashMap *map = (struct HashMap*)malloc(sizeof(struct HashMap));
+    for (int i = 0; i < HASH_TABLE_SIZE; i++) {
+        map->entries[i] = NULL;
+    }
     return map;
 }
 
-// Frees a hash map and all its entries
 void hashmap_free(struct HashMap *map) {
-    struct Entry *entry, *temp;
     for (int i = 0; i < HASH_TABLE_SIZE; i++) {
-        entry = map->entries[i];
+        struct Entry *entry = map->entries[i];
         while (entry) {
-            temp = entry;
-            entry = entry->next;
-            free(temp->key);
-            free(temp);
+            struct Entry *next = entry->next;
+            free(entry->key);
+            free(entry->value);
+            free(entry);
+            entry = next;
         }
     }
     free(map);
 }
 
-// Adds a key-value pair to the hash map
 void hashmap_put(struct HashMap *map, const char *key, char *value) {
     unsigned int index = hash(key);
-    struct Entry *entry = map->entries[index];
-    while (entry) {
-        if (!strcmp(entry->key, key)) {
-            entry->value = value;
-            return;
-        }
-        entry = entry->next;
-    }
-    entry = malloc(sizeof(struct Entry));
+    struct Entry *entry = (struct Entry*)malloc(sizeof(struct Entry));
     entry->key = strdup(key);
-    entry->value = value;
+    entry->value = strdup(value);
     entry->next = map->entries[index];
     map->entries[index] = entry;
 }
 
-// Gets the value associated with a key, or returns NULL if not found
 char* hashmap_get(struct HashMap *map, const char *key) {
     unsigned int index = hash(key);
     struct Entry *entry = map->entries[index];
     while (entry) {
-        if (!strcmp(entry->key, key))
+        if (strcmp(entry->key, key) == 0) {
             return entry->value;
+        }
         entry = entry->next;
     }
     return NULL;
+}
+
+void hashmap_print_all(struct HashMap *map) {
+    for (int i = 0; i < HASH_TABLE_SIZE; i++) {
+        struct Entry *entry = map->entries[i];
+        while (entry) {
+            printf("%s: %s\n", entry->key, entry->value);
+            fflush(stdout);
+            entry = entry->next;
+        }
+    }
 }

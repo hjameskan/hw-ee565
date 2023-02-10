@@ -1,20 +1,43 @@
-ifndef port
-port = 8345
+ifndef port1
+port1 = 8345
 endif
 
-.PHONY: clean
-all: vodserver
+ifndef port2
+port2 = 8346
+endif
 
-vodserver: src/main.c
-	gcc -Wall -o vodserver src/main.c src/socket_utils.c src/http_utils.c src/uri_parse.c
+ifndef port3
+port3 = 8347
+endif
+
+CC=gcc
+CFLAGS= -pthread -g
+
+.PHONY: clean
+all: vodserver peerserver
+
+vodserver: src/main.o src/socket_utils.o src/http_utils.o src/uri_parse.o src/hashmap.o
+	$(CC) $(CFLAGS) $^ -o $@
+
+peerserver: src/udp-server.o src/hashmap.o
+	$(CC) $(CFLAGS) $^ -o $@
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+run-peer: peerserver
+	./peerserver $(port3)
 
 run: vodserver
-	./vodserver $(port)
+	./vodserver $(port1) $(port2)
 
 test:
-	(cd scripts; ./test_script.sh $(port) | tee test.log)
+	(cd scripts; ./test_script.sh $(port1) | tee test.log)
 
 clean:
-	rm -f vodserver
+	rm -f src/*.o vodserver peerserver
 	rm -rf scripts/dump
 	rm -f scripts/test.log
+
+clean-peer:
+	rm -f udp-server hashmap.o peerserver.o

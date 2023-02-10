@@ -18,10 +18,10 @@
 #define WINDOW_SIZE 10
 #define MAX_DATA_LEN 20
 #define PACKET_DATA_SIZE 1024
-#define HEADER_SIZE 319
+#define HEADER_SIZE 548
 
 typedef struct {
-  char connection_id[27]; // IP + tid
+  char connection_id[256]; // IP + tid
   char packet_type[16]; // "ack" "fin" "syn" "synack" "put"
   int ack_number;
   char file_path[256];
@@ -180,7 +180,10 @@ void transfer_file(int sockfd, struct sockaddr_in client_addr, Packet* input_pac
     socklen_t addr_size;
     addr_size = sizeof(client_addr);
 
-    char* filepath = input_packet->file_path;
+    // char* filepath = input_packet->file_path;
+    char filepath[256];
+    strcpy(filepath, "content/");
+    strcat(filepath, input_packet->file_path);
     fflush(stdout);
 
     FILE *requested_file = fopen(filepath, "rb");

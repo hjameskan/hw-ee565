@@ -28,4 +28,6 @@ void hashmap_put(struct HashMap *map, const char *key, char *value);
 // Gets the value associated with a key, or returns NULL if not found
 char* hashmap_get(struct HashMap *map, const char *key);
 
+void hashmap_print_all(struct HashMap *map);
+
 #endif

@@ -6,6 +6,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+struct file_info {
+    char filename[256];
+    char filetype[256];
+};
+
 // inputs
 //      -  request => pointer to a copy of the receive buffer contents (containing the
 //      HTTP request)
@@ -31,7 +36,7 @@ int content_type_lookup(char *content_type, char *filetype);
 int is_peer_path(char *path_string) ;
 
 
-void process_peer_path(char *path_string, int connect_fd);
+void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer);
 
 
 

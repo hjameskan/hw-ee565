@@ -14,14 +14,14 @@ all: udp-server udp-client
 udp-server: udp-server.o hashmap.o
 	$(CC) $(CFLAGS) -o $@ $^
 
+udp-client: udp-client.c
+	$(CC) $(CFLAGS) -o $@ $^
+
 udp-server.o: udp-server.c
 	$(CC) $(CFLAGS) -c $<
 
 hashmap.o: hashmap.c
 	$(CC) $(CFLAGS) -c $<
-
-udp-client: udp-client.c
-	$(CC) $(CFLAGS) -o $@ $^
 
 run-server: udp-server
 	./udp-server $(port)

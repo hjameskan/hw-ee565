@@ -19,4 +19,10 @@ void transfer_standard_file(char *file_path, int socket_fd, char *content_type);
 
 void send_http_200(int connection_fd);
 
+void send_http_404(int connection_fd);
+
+int get_range(char *og_req_buffer, int *startbyte, int *endbyte);
+
+void send_http_200_no_range(int connection_fd, char *content_type/*, char *last_modified, off_t file_size*/);
+
 #endif

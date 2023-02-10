@@ -1,10 +1,11 @@
-version: '3'
+version: '3.9'
 services:
   web:
     image: my-ubuntu:latest
     ports:
       - "8345:8345"
       - "8346:8346"
+      - "8347:8347"
     container_name: hw2
     command: ["./container-startup.sh"]
     volumes:
@@ -13,4 +14,4 @@ services:
     # we need this to access the host's network
     # because we need to access the host's IP
     # more complications arise otherwise in different OSes
-    network_mode: "host"
+    # network_mode: "host"

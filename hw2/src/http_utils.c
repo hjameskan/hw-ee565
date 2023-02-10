@@ -1,3 +1,7 @@
+#include <sys/socket.h>
+#include <unistd.h>
+#include <ctype.h>
+#include <limits.h>
 #include "http_utils.h"
 
 void generate_timestamp(char *buf) {
@@ -205,4 +209,86 @@ void send_http_200(int connection_fd) {
     send(connection_fd, message, strlen(message), 0);
 
     close(connection_fd);
+}
+
+void send_http_404(int connection_fd) {
+    char message[200];
+    char date_timestamp[100];
+
+    generate_timestamp(date_timestamp);
+
+    sprintf(message,"HTTP/1.1 404 Not Found\r\n"
+                        "Content-Type: text/html; charset=UTF-8\r\n\r\n"
+                        "<html><body>404 Not Found</body></html>\r\n",
+                    date_timestamp);
+
+    send(connection_fd, message, strlen(message), 0);
+
+    close(connection_fd);
+}
+
+int get_range(char *og_req_buffer, int *startbyte, int *endbyte) {
+    // check for the Range field in the headers
+    if (strstr(og_req_buffer, "Range:")) {
+        // long * range_start, *range_end;
+        // extract the range values from the headers
+        char *range_header = strstr(og_req_buffer, "Range:");
+        char *range_start_str, *range_end_str;
+
+        range_start_str = strchr(range_header, '=') + 1;
+        range_end_str = strchr(range_start_str, '-');
+        if (range_end_str && isdigit((unsigned char)*(range_end_str+1))) {
+            *range_end_str = '\0'; // replace '-' with null character
+            *startbyte = strtol(range_start_str, NULL, 10);
+            *endbyte = strtol(range_end_str + 1, NULL, 10);
+        } else {
+            *endbyte = -1;
+            // range_start = strtol(range_start_str, NULL, 10);
+            // range_end = file_size - 1;
+        }
+        // check if range starts from 0
+        // if (range_start >= 0 && range_start < file_size) {
+        //     if (range_end >= file_size) {
+        //         range_end = file_size - 1; // adjust end range to the end of the file
+        //     }
+        // } else {
+            // // send "416 Range Not Satisfiable" response if range is not valid
+            // sprintf(headers, "HTTP/1.1 416 Range Not Satisfiable\r\n"
+            // "Content-Range: bytes */%ld\r\n"
+            // "Content-Type: text/html; charset=UTF-8\r\n\r\n"
+            // "Date: %s\r\n"
+            // "<html><body>416 Range Not Satisfiable</body></html>\r\n", file_size, date_timestamp);
+            // send(socket_fd, headers, strlen(headers), 0);
+        // }
+    } else {
+        // // send "200 OK" response if no range is specified
+        // sprintf(headers, "HTTP/1.1 200 OK\r\nContent-Type: %s\r\n"
+        //                 "Content-Length: %ld\r\nLast-Modified: %s\r\n"
+        //                 "Date: %s\r\n"
+        //                 "Connection: Keep-Alive\r\n\r\n",
+        //                 content_type, file_size, last_modified, date_timestamp);
+
+        // send(socket_fd, headers, strlen(headers), 0);
+
+    }
+
+    return -1;
+}
+
+void send_http_200_no_range(int connection_fd, char *content_type/*, char *last_modified, off_t file_size*/) {
+    printf("Sending 200 content-type: %s \n", content_type);
+    sleep(10);
+    char message[200];
+    char date_timestamp[100];
+
+    generate_timestamp(date_timestamp);
+
+    sprintf(message,"HTTP/1.1 200 OK\r\nContent-Type: %s\r\n"
+                    "Content-Length: %ld\r\nLast-Modified: %s\r\n"
+                    "Date: %s\r\n"
+                    "Connection: Keep-Alive\r\n\r\n",
+                    content_type, INT_MAX, date_timestamp, date_timestamp);
+                    // content_type, file_size, last_modified, date_timestamp);
+
+    send(connection_fd, message, strlen(message), 0);
 }

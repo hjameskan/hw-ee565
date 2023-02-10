@@ -1,5 +1,5 @@
 .DS_Store
-.vscode/*
+.vscode
 vodserver
 */content/video/*.bak
 udp-server
@@ -12,3 +12,7 @@ udp-server3.c
 udp-client3.c
 udp-server.o
 udp-client.o
+*.log
+.editorconfig
+*.o
+peerserver

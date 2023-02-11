@@ -11,10 +11,10 @@
 
 struct peer_url
 {
-    char *path;
-    char *host;
-    char *port;
-    char *rate;
+    char path[256];
+    char host[256];
+    char port[256];
+    char rate[256];
 };
 
 struct file_info {

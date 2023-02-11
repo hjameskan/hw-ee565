@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 
+
 #include "uri_parse.h"
 #include "http_utils.h"
 #include "hashmap.h"
@@ -16,7 +17,7 @@
 extern struct HashMap *sockets_map;
 extern int udp_connection_fd;
 
-int peers_count = 7;
+int peers_count = 0;
 
 struct peer_url peers_list[100] = {
     {.path = "video/sample4.ogg",
@@ -275,17 +276,21 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
         printf("\n");
         printf("test path %s\n", add_info.path);
         printf("test host %s\n", add_info.host);
-        printf("test port %d\n", add_info.port);
-        printf("test rate %d\n", add_info.rate);
+        printf("test port %s\n", add_info.port);
+        printf("test rate %s\n", add_info.rate);
 
         // ********************************
         // PERFORM /PEER/ADD work here
         // ********************************
         struct peer_url peer;
-        peer.path = add_info.path;
-        peer.host = add_info.host;
-        peer.port = add_info.port;
-        peer.rate = add_info.rate;
+        strcpy(peer.path, add_info.path);
+        strcpy(peer.host, add_info.host);
+        strcpy(peer.port, add_info.port);
+        strcpy(peer.rate, add_info.rate);
+        // peer.path = add_info.path;
+        // peer.host = add_info.host;
+        // peer.port = add_info.port;
+        // peer.rate = add_info.rate;
         // printf("this is the peer: %s %s %d %d")
 
         // char port[10] = {0};
@@ -527,6 +532,7 @@ void print_peers_list()
         if (peers_list[i].path != NULL)
         {
             printf("Peer %d: path=%s, host=%s, port=%s, rate=%s \n", i, peers_list[i].path, peers_list[i].host, peers_list[i].port, peers_list[i].rate);
+            fflush(stdout);
         }
     }
 }

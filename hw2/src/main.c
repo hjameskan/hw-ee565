@@ -494,7 +494,7 @@ void udp_to_tcp_client(int *packet_count, struct timeval start_time, struct time
         gettimeofday(&current_time, NULL);
         char *rate_str = get_rate_of_path(file_packet.file_path, peers_list, 7);
         int rate_limit = atoi(rate_str); // Bytes per second
-        printf("[+] Rate limit: %d\n", rate_limit);
+        // printf("[+] Rate limit: %d\n", rate_limit);
 
         double bytes_sent = *packet_count * 1024.0; // convert packet count to bytes
         double sleep_time = 0.0; // time to sleep in seconds

@@ -25,7 +25,7 @@ peerserver: src/udp-server.o src/hashmap.o
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-run-peer: peerserver
+run-server: peerserver
 	./peerserver $(port3)
 
 run: vodserver
@@ -39,5 +39,5 @@ clean:
 	rm -rf scripts/dump
 	rm -f scripts/test.log
 
-clean-peer:
+clean-server:
 	rm -f udp-server hashmap.o peerserver.o

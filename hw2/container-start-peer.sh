@@ -8,5 +8,5 @@ echo 'I am running in a container\n'
 
 # cd src/udp
 
-make clean-peer
-make run-peer
+make clean-server
+make run-server

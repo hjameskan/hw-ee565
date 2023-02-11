@@ -5,11 +5,36 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
+
+#define PACKET_DATA_SIZE 1024
+
+struct peer_url
+{
+    char *path;
+    char *host;
+    char *port;
+    char *rate;
+};
 
 struct file_info {
     char filename[256];
     char filetype[256];
 };
+
+typedef struct {
+  char connection_id[256]; // IP + tid
+  char packet_type[16]; // "ack" "fin" "syn" "synack" "put"
+  int ack_number;
+  char file_path[256];
+  int start_byte;
+  int end_byte; // not yet implemented
+  int packet_number;
+  int packet_data_size;
+  bool orig_has_range;
+  int content_length;
+  char packet_data[PACKET_DATA_SIZE];
+} Packet;
 
 // inputs
 //      -  request => pointer to a copy of the receive buffer contents (containing the
@@ -37,6 +62,8 @@ int is_peer_path(char *path_string) ;
 
 
 void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer);
+void print_packet(Packet *packet, char *text);
+bool parse_http_range_header(const char *request_buffer, int *start, int *end);
 
 
 

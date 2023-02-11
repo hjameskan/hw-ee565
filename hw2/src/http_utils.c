@@ -4,11 +4,8 @@
 #include <limits.h>
 #include "http_utils.h"
 
-void generate_timestamp(char *buf) {
-    //time_t now = time(0);
-    //struct tm tm_ = *gmtime(&now);
-    //strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S %Z", &tm_);
-
+void generate_timestamp(char *buf)
+{
     time_t current_time; // the date string
 
     struct tm *time_info;
@@ -18,19 +15,18 @@ void generate_timestamp(char *buf) {
     time_info = gmtime(&current_time);
     strftime(time_string, sizeof(time_string), "%a, %d %b %Y %H:%M:%S GMT", time_info);
 
-    //printf("NOTICE: %s\n", time_string);
-
     strcpy(buf, time_string);
-
 }
 
 void transfer_file_chunk(char *og_req_buffer, char *file_path, int socket_fd,
-                    char *content_type) {
+                         char *content_type)
+{
     // seperate http response file tranfer routine for video-type files
 
     // open the file
     int fd = open(file_path, O_RDONLY);
-    if (fd == -1) {
+    if (fd == -1)
+    {
         // TODO: insert 500 http response here?
         perror("Error opening video file");
         close(socket_fd);
@@ -43,16 +39,17 @@ void transfer_file_chunk(char *og_req_buffer, char *file_path, int socket_fd,
     char last_modified[100];
     struct tm timeinfo;
     struct stat stat_buf;
-    fstat(fd, & stat_buf);
-    localtime_r( & stat_buf.st_mtime, & timeinfo);
-    strftime(last_modified, sizeof(last_modified), "%a, %d %b %Y %H:%M:%S %Z", & timeinfo);
+    fstat(fd, &stat_buf);
+    localtime_r(&stat_buf.st_mtime, &timeinfo);
+    strftime(last_modified, sizeof(last_modified), "%a, %d %b %Y %H:%M:%S %Z", &timeinfo);
 
     char date_timestamp[200];
     generate_timestamp(date_timestamp);
 
     // check for the Range field in the headers
-    if (strstr(og_req_buffer, "Range:")) {
-        char * range_start, *range_end;
+    if (strstr(og_req_buffer, "Range:"))
+    {
+        char *range_start, *range_end;
         // extract the range values from the headers
         char *range_header = strstr(og_req_buffer, "Range:");
         // sscanf(buffer, "Range: bytes=%ld-%ld", & range_start, & range_end);
@@ -60,36 +57,44 @@ void transfer_file_chunk(char *og_req_buffer, char *file_path, int socket_fd,
 
         range_start_str = strchr(range_header, '=') + 1;
         range_end_str = strchr(range_start_str, '-');
-        if (range_end_str && isdigit((unsigned char)*(range_end_str+1))) {
+        if (range_end_str && isdigit((unsigned char)*(range_end_str + 1)))
+        {
             *range_end_str = '\0'; // replace '-' with null character
             range_start = strtol(range_start_str, NULL, 10);
             range_end = strtol(range_end_str + 1, NULL, 10);
-        } else {
+        }
+        else
+        {
             range_start = strtol(range_start_str, NULL, 10);
             range_end = file_size - 1;
         }
         // check if range starts from 0
-        if (range_start >= 0 && range_start < file_size) {
-            if (range_end >= file_size) {
+        if (range_start >= 0 && range_start < file_size)
+        {
+            if (range_end >= file_size)
+            {
                 range_end = file_size - 1; // adjust end range to the end of the file
             }
 
-            if (range_start == 0) {
+            if (range_start == 0)
+            {
                 // send "206 Partial Content" response with appropriate Content-Range header
                 sprintf(headers, "HTTP/1.1 206 Partial Content\r\n"
-                                "Content-Range: bytes 0-%ld/%ld\r\n"
-                                "Content-Type: %s\r\nLast-Modified: %s\r\n"
-                                "Date: %s\r\n"
-                                "Connection: Keep-Alive\r\n\r\n",
-                                range_end, file_size, content_type, last_modified, date_timestamp);
-            } else {
+                                 "Content-Range: bytes 0-%ld/%ld\r\n"
+                                 "Content-Type: %s\r\nLast-Modified: %s\r\n"
+                                 "Date: %s\r\n"
+                                 "Connection: Keep-Alive\r\n\r\n",
+                        range_end, file_size, content_type, last_modified, date_timestamp);
+            }
+            else
+            {
                 // send "206 Partial Content" response with appropriate Content-Range header
                 sprintf(headers, "HTTP/1.1 206 Partial Content\r\n"
-                             "Content-Range: bytes %ld-%ld/%ld\r\n"
-                             "Content-Type: %s\r\nLast-Modified: %s\r\n"
-                             "Date: %s\r\n"
-                             "Connection: Keep-Alive\r\n\r\n",
-                             range_start, range_end, file_size, content_type, last_modified, date_timestamp);
+                                 "Content-Range: bytes %ld-%ld/%ld\r\n"
+                                 "Content-Type: %s\r\nLast-Modified: %s\r\n"
+                                 "Date: %s\r\n"
+                                 "Connection: Keep-Alive\r\n\r\n",
+                        range_start, range_end, file_size, content_type, last_modified, date_timestamp);
             }
 
             send(socket_fd, headers, strlen(headers), 0);
@@ -101,38 +106,48 @@ void transfer_file_chunk(char *og_req_buffer, char *file_path, int socket_fd,
 
             bytes_to_read = range_end - range_start + 1;
 
-            while (bytes_to_read > 0) {
-                if (sizeof(buffer) > bytes_to_read) {
+            while (bytes_to_read > 0)
+            {
+                if (sizeof(buffer) > bytes_to_read)
+                {
                     bytes_read = read(fd, buffer, bytes_to_read);
-                } else {
+                }
+                else
+                {
                     bytes_read = read(fd, buffer, sizeof(buffer));
                 }
 
                 send(socket_fd, buffer, bytes_read, 0);
                 bytes_to_read -= bytes_read;
             }
-        } else {
+        }
+        else
+        {
             // send "416 Range Not Satisfiable" response if range is not valid
             sprintf(headers, "HTTP/1.1 416 Range Not Satisfiable\r\n"
-            "Content-Range: bytes */%ld\r\n"
-            "Content-Type: text/html; charset=UTF-8\r\n\r\n"
-            "Date: %s\r\n"
-            "<html><body>416 Range Not Satisfiable</body></html>\r\n", file_size, date_timestamp);
+                             "Content-Range: bytes */%ld\r\n"
+                             "Content-Type: text/html; charset=UTF-8\r\n\r\n"
+                             "Date: %s\r\n"
+                             "<html><body>416 Range Not Satisfiable</body></html>\r\n",
+                    file_size, date_timestamp);
             send(socket_fd, headers, strlen(headers), 0);
         }
-    } else {
+    }
+    else
+    {
         // send "200 OK" response if no range is specified
         sprintf(headers, "HTTP/1.1 200 OK\r\nContent-Type: %s\r\n"
-                        "Content-Length: %ld\r\nLast-Modified: %s\r\n"
-                        "Date: %s\r\n"
-                        "Connection: Keep-Alive\r\n\r\n",
-                        content_type, file_size, last_modified, date_timestamp);
+                         "Content-Length: %ld\r\nLast-Modified: %s\r\n"
+                         "Date: %s\r\n"
+                         "Connection: Keep-Alive\r\n\r\n",
+                content_type, file_size, last_modified, date_timestamp);
 
         send(socket_fd, headers, strlen(headers), 0);
 
         char buffer[4096];
         ssize_t bytes_read;
-        while ((bytes_read = read(fd, buffer, sizeof(buffer))) > 0) {
+        while ((bytes_read = read(fd, buffer, sizeof(buffer))) > 0)
+        {
             send(socket_fd, buffer, bytes_read, 0);
         }
     }
@@ -140,22 +155,22 @@ void transfer_file_chunk(char *og_req_buffer, char *file_path, int socket_fd,
     close(fd);
 }
 
-
-void transfer_standard_file(char *file_path, int socket_fd, char *content_type) {
+void transfer_standard_file(char *file_path, int socket_fd, char *content_type)
+{
     // transfers an entire file located at file_path through the socket
     // at socket_fd in a single http response.
     //
     // the http's Content-Type header field is parameterised by 'content_type'
     // string
 
-
     int fd = open(file_path, O_RDONLY);
 
-    if (fd == -1) {
+    if (fd == -1)
+    {
 
         perror("Error opening text file");
 
-        char* message = "HTTP/1.1 404 Not Found\r\n" // TODO: maybe this should be a different error message
+        char *message = "HTTP/1.1 404 Not Found\r\n" // TODO: maybe this should be a different error message
                         "Content-Type: text/html; charset=UTF-8\r\n\r\n"
                         "<html><body>404 Not Found</body></html>\r\n";
 
@@ -176,60 +191,64 @@ void transfer_standard_file(char *file_path, int socket_fd, char *content_type) 
 
     fstat(fd, &stat_buf);
     localtime_r(&stat_buf.st_mtime, &timeinfo);
-    strftime(last_modified, sizeof last_modified, "%a, %d %b %Y %H:%M:%S %Z", & timeinfo);
+    strftime(last_modified, sizeof last_modified, "%a, %d %b %Y %H:%M:%S %Z", &timeinfo);
 
     sprintf(headers, "HTTP/1.1 200 OK\r\nContent-Type: %s\r\n"
                      "Content-Length: %ld\r\nLast-Modified: %s\r\n\r\n"
-                     "Connection: Keep-Alive\r\n\r\n", content_type, file_size, last_modified);
+                     "Connection: Keep-Alive\r\n\r\n",
+            content_type, file_size, last_modified);
 
     send(socket_fd, headers, strlen(headers), 0);
 
     ssize_t bytes_read;
-    while ((bytes_read = read(fd, buffer, sizeof buffer)) > 0) {
+    while ((bytes_read = read(fd, buffer, sizeof buffer)) > 0)
+    {
         send(socket_fd, buffer, bytes_read, 0);
     }
 }
 
-
-
-void send_http_200(int connection_fd) {
+void send_http_200(int connection_fd)
+{
     char message[200];
     char date_timestamp[100];
 
     generate_timestamp(date_timestamp);
 
-    sprintf(message,"HTTP/1.1 200 OK\r\n"
-                    "Content-Type: text/html; charset=UTF-8\r\n"
+    sprintf(message, "HTTP/1.1 200 OK\r\n"
+                     "Content-Type: text/html; charset=UTF-8\r\n"
                      // note: we place double <CR> <LF> here since
                      // the following part of the response is the content payload
-                    "Date: %s\r\n\r\n"
-                    "<html><body>Hello World!</body></html>\r\n",
-                    date_timestamp);
+                     "Date: %s\r\n\r\n"
+                     "<html><body>Hello World!</body></html>\r\n",
+            date_timestamp);
 
     send(connection_fd, message, strlen(message), 0);
 
     close(connection_fd);
 }
 
-void send_http_404(int connection_fd) {
+void send_http_404(int connection_fd)
+{
     char message[200];
     char date_timestamp[100];
 
     generate_timestamp(date_timestamp);
 
-    sprintf(message,"HTTP/1.1 404 Not Found\r\n"
-                        "Content-Type: text/html; charset=UTF-8\r\n\r\n"
-                        "<html><body>404 Not Found</body></html>\r\n",
-                    date_timestamp);
+    sprintf(message, "HTTP/1.1 404 Not Found\r\n"
+                     "Content-Type: text/html; charset=UTF-8\r\n\r\n"
+                     "<html><body>404 Not Found</body></html>\r\n",
+            date_timestamp);
 
     send(connection_fd, message, strlen(message), 0);
 
     close(connection_fd);
 }
 
-int get_range(char *og_req_buffer, int *startbyte, int *endbyte) {
+int get_range(char *og_req_buffer, int *startbyte, int *endbyte)
+{
     // check for the Range field in the headers
-    if (strstr(og_req_buffer, "Range:")) {
+    if (strstr(og_req_buffer, "Range:"))
+    {
         // long * range_start, *range_end;
         // extract the range values from the headers
         char *range_header = strstr(og_req_buffer, "Range:");
@@ -237,58 +256,62 @@ int get_range(char *og_req_buffer, int *startbyte, int *endbyte) {
 
         range_start_str = strchr(range_header, '=') + 1;
         range_end_str = strchr(range_start_str, '-');
-        if (range_end_str && isdigit((unsigned char)*(range_end_str+1))) {
+        if (range_end_str && isdigit((unsigned char)*(range_end_str + 1)))
+        {
             *range_end_str = '\0'; // replace '-' with null character
             *startbyte = strtol(range_start_str, NULL, 10);
             *endbyte = strtol(range_end_str + 1, NULL, 10);
-        } else {
-            *endbyte = -1;
-            // range_start = strtol(range_start_str, NULL, 10);
-            // range_end = file_size - 1;
         }
-        // check if range starts from 0
-        // if (range_start >= 0 && range_start < file_size) {
-        //     if (range_end >= file_size) {
-        //         range_end = file_size - 1; // adjust end range to the end of the file
-        //     }
-        // } else {
-            // // send "416 Range Not Satisfiable" response if range is not valid
-            // sprintf(headers, "HTTP/1.1 416 Range Not Satisfiable\r\n"
-            // "Content-Range: bytes */%ld\r\n"
-            // "Content-Type: text/html; charset=UTF-8\r\n\r\n"
-            // "Date: %s\r\n"
-            // "<html><body>416 Range Not Satisfiable</body></html>\r\n", file_size, date_timestamp);
-            // send(socket_fd, headers, strlen(headers), 0);
-        // }
-    } else {
-        // // send "200 OK" response if no range is specified
-        // sprintf(headers, "HTTP/1.1 200 OK\r\nContent-Type: %s\r\n"
-        //                 "Content-Length: %ld\r\nLast-Modified: %s\r\n"
-        //                 "Date: %s\r\n"
-        //                 "Connection: Keep-Alive\r\n\r\n",
-        //                 content_type, file_size, last_modified, date_timestamp);
-
-        // send(socket_fd, headers, strlen(headers), 0);
-
+        else
+        {
+            *endbyte = -1;
+        }
+    }
+    else
+    {
     }
 
     return -1;
 }
 
-void send_http_200_no_range(int connection_fd, char *content_type/*, char *last_modified, off_t file_size*/) {
+void send_http_200_no_range(int connection_fd, char *content_type, int file_size /*, char *last_modified, off_t file_size*/)
+{
     printf("Sending 200 content-type: %s \n", content_type);
-    sleep(10);
+    printf("Sending 200 file_size: %d \n", file_size);
+    fflush(stdout);
     char message[200];
     char date_timestamp[100];
 
     generate_timestamp(date_timestamp);
 
-    sprintf(message,"HTTP/1.1 200 OK\r\nContent-Type: %s\r\n"
-                    "Content-Length: %ld\r\nLast-Modified: %s\r\n"
-                    "Date: %s\r\n"
-                    "Connection: Keep-Alive\r\n\r\n",
-                    content_type, INT_MAX, date_timestamp, date_timestamp);
-                    // content_type, file_size, last_modified, date_timestamp);
+    sprintf(message, "HTTP/1.1 200 OK\r\nContent-Type: %s\r\n"
+                     "Content-Length: %ld\r\nLast-Modified: %s\r\n"
+                     "Date: %s\r\n"
+                     "Connection: Keep-Alive\r\n\r\n",
+            content_type, file_size, date_timestamp, date_timestamp);
+    // content_type, file_size, last_modified, date_timestamp);
 
     send(connection_fd, message, strlen(message), 0);
+    // sleep(100);
+}
+
+int send_http_206_partial_content(int connection_fd, char *content_type, long file_size, int range_start, int range_end) {
+    if (range_end == -1 || range_end >= file_size || range_end < range_start || range_end == NULL) {
+        range_end = file_size - 1;
+    }
+    // send "206 Partial Content" response if range is valid
+    char message[1024];
+    char date_timestamp[100];
+    generate_timestamp(date_timestamp);
+    printf("message: %s \n", message);
+    sprintf(message, "HTTP/1.1 206 Partial Content\r\n"
+                        "Content-Range: bytes %ld-%ld/%ld\r\n"
+                        "Content-Type: %s\r\n"
+                        "Content-Length: %ld\r\n"
+                        "Last-Modified: %s\r\n"
+                        // "Last-Modified: Sat, 11 Feb 2023 00:03:43 GMT\r\n"
+                        "Date: %s\r\n"
+                        "Connection: Keep-Alive\r\n\r\n",
+                        range_start, range_end, file_size, content_type, file_size, date_timestamp, date_timestamp);
+    return send(connection_fd, message, strlen(message), 0);
 }

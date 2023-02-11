@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <time.h>
+#include <stdbool.h>
 #include "hashmap.h"
 
 #define MAX_CONNECTIONS 1
@@ -29,6 +30,8 @@ typedef struct {
   int end_byte; // not yet implemented
   int packet_number;
   int packet_data_size;
+  bool orig_has_range;
+  int content_length;
   char packet_data[PACKET_DATA_SIZE];
 } Packet;
 
@@ -38,6 +41,9 @@ void transfer_file(int sockfd, struct sockaddr_in client_addr, Packet* packet);
 int recvfrom_timeout(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen, int timeout);
 void duplicate_packet(Packet *packet1, Packet *packet2);
 void printf_packet(Packet *packet, char* text);
+int min(int x, int y) {
+    return x < y ? x : y;
+}
 
 int main(int argc, char **argv){
   if (argc != 2){
@@ -132,6 +138,8 @@ void routing_handler(void *socket_desc, struct sockaddr_in client_addr, Packet *
   socklen_t addr_size;
   addr_size = sizeof(client_addr);
 
+  printf_packet(input_packet, "ROUTING HANDLER: input packet");
+
   if (strncmp(input_packet->packet_type, "syn", strlen("syn")) == 0) {
     char* filepath = input_packet->packet_data;
     
@@ -202,16 +210,50 @@ void transfer_file(int sockfd, struct sockaddr_in client_addr, Packet* input_pac
         return;
     }
 
+    // printf_packet(input_packet, "INPUT PACKET");
     // send 1 packet
     Packet output_packet;
     duplicate_packet(&output_packet, input_packet);
+    if(input_packet->ack_number == 0){
+        // set ouptut packet content length with file path
+        struct stat st;
+      if (stat(filepath, &st) == 0) {
+          printf("File size: %ld bytes\n", st.st_size);
+          // set correct file size
+          output_packet.content_length = st.st_size;
+          // also double check the end byte since already here
+          if(
+            output_packet.end_byte == -1 
+            || output_packet.end_byte >= st.st_size 
+            || output_packet.end_byte == NULL
+            || output_packet.end_byte == ""
+            ){
+            output_packet.end_byte = st.st_size - 1;
+          }
+      } else {
+          printf("Failed to get file size\n");
+      }
+    }
     int packet_number = 0;
-    int n_bytes = fread(output_packet.packet_data, 1, PACKET_DATA_SIZE, requested_file);
+    int need_to_read_bytes = 0;
+    if(output_packet.orig_has_range == 1) {
+        printf("orig_has_range: %d\n", output_packet.orig_has_range);
+        printf("start_byte: %d\n", output_packet.start_byte);
+        printf("end_byte: %d \n", output_packet.end_byte);
+        fflush(stdout);
+        need_to_read_bytes = min(PACKET_DATA_SIZE, output_packet.end_byte - output_packet.start_byte + 1);
+    } else {
+        need_to_read_bytes = PACKET_DATA_SIZE;
+    }
+    printf("need_to_read_bytes: %d\n", need_to_read_bytes);
+    fflush(stdout);
+    int n_bytes = fread(output_packet.packet_data, 1, need_to_read_bytes, requested_file);
     output_packet.packet_number = input_packet->ack_number;
     output_packet.packet_data_size = n_bytes;
     if (n_bytes > 0) {
         int size = sizeof(output_packet);
         printf("[+]Sending packet %d of size %d\n", output_packet.packet_number, n_bytes);
+        fflush(stdout);
 
         int bytes_sent = 0;
         int sent = sendto(sockfd, (char*) &output_packet, sizeof(Packet), 0, (struct sockaddr*)&client_addr, addr_size);
@@ -252,33 +294,40 @@ int recvfrom_timeout(int sockfd, void *buf, size_t len, int flags, struct sockad
 }
 
 void duplicate_packet(Packet *packet1, Packet *packet2) {
-    packet1->packet_number = packet2->packet_number;
+    strcpy(packet1->connection_id, packet2->connection_id);
+    strcpy(packet1->packet_type, packet2->packet_type);
     packet1->ack_number = packet2->ack_number;
+    strcpy(packet1->file_path, packet2->file_path);
     packet1->start_byte = packet2->start_byte;
     packet1->end_byte = packet2->end_byte;
+    packet1->packet_number = packet2->packet_number;
     packet1->packet_data_size = packet2->packet_data_size;
-    strcpy(packet1->packet_type, packet2->packet_type);
-    strcpy(packet1->connection_id, packet2->connection_id);
-    strcpy(packet1->file_path, packet2->file_path);
+    packet1->orig_has_range = packet2->orig_has_range;
+    packet1->content_length = packet2->content_length;
 }
 
 void printf_packet(Packet *packet, char* text) {
-    if (text == NULL){
-      text = "";
+    if (text == NULL)
+    {
+        text = "";
     }
-
+    // if(packet->ack_number>0){
+    //   return;
+    // }
     printf("\n");
     printf("====================== This is the packet ======================\n");
     printf("====================== %s ======================\n", text);
-    printf("packet_number: %d\n", packet->packet_number);
-    printf("ack_number: %d\n", packet->ack_number); 
+    printf("connection_id: %s\n", packet->connection_id);
+    printf("packet_type: %s\n", packet->packet_type);
+    printf("ack_number: %d\n", packet->ack_number);
+    printf("file_path: %s\n", packet->file_path);
     printf("start_byte: %d\n", packet->start_byte);
     printf("end_byte: %d\n", packet->end_byte);
+    printf("packet_number: %d\n", packet->packet_number);
     printf("packet_data_size: %d\n", packet->packet_data_size);
-    printf("packet_type: %s\n", packet->packet_type);
-    printf("connection_id: %s\n", packet->connection_id);
-    printf("file_path: %s\n", packet->file_path);
-    printf("tid: %d\n", pthread_self());
+    printf("orig_has_range: %d\n", packet->orig_has_range);
+    printf("content_length: %d\n", packet->content_length);
+    // printf("tid: %d\n", pthread_self());
     printf("\n");
     fflush(stdout);
 }

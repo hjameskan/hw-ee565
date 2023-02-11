@@ -13,9 +13,11 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <time.h>
+#include <sys/time.h>
 #include <ctype.h>
 #include <string.h>
 #include <pthread.h>
+#include <errno.h>
 
 #include "socket_utils.h"
 #include "http_utils.h"
@@ -23,27 +25,22 @@
 #include "hashmap.h"
 
 #define BACKLOG 100 // how many pending connections queue will hold
-#define MAX_THREADS 100
+#define MAX_THREADS 10000
 #define PACKET_DATA_SIZE 1024
 #define IP_ADDRESS "127.0.0.1"
 
-typedef struct
-{
-    char connection_id[27]; // IP + tid
-    char packet_type[16];   // "ack" "fin" "syn" "synack" "put"
-    int ack_number;
-    char file_path[256];
-    int start_byte;
-    int end_byte; // not yet implemented
-    int packet_number;
-    int packet_data_size;
-    char packet_data[PACKET_DATA_SIZE];
-} Packet;
+extern int peers_count;
+extern struct peer_url peers_list[100];
+
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+int connections[MAX_THREADS];
+int num_connections = 0;
+
 
 pthread_t threads[MAX_THREADS];
 int new_fd;
 int thread_index = 0;
-int tcp_connection_fd;
 int udp_connection_fd;
 
 struct HashMap *sockets_map;
@@ -53,12 +50,21 @@ void child_routine(int connect_fd);
 void *udp_thread_routine(int *arg);
 int recvfrom_timeout(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen, int timeout);
 char** str_split(char* a_str, const char a_delim);
-void udp_to_tcp_client();
+void udp_to_tcp_client(int *packet_num, struct timeval start_time, struct timeval current_time);
 void duplicate_packet(Packet *packet1, Packet *packet2);
+int remove_socket(int sockfd);
+int is_socket_in_array(int sockfd);
+char *get_rate_of_path(const char *path, struct peer_url *peers_list, int num_peers);
+void nano_sleep(int nanoseconds);
 
+void sigpipe_handler(int signo) {
+    printf("Broken pipe detected\n");
+    printf("I DO NOTHING\n");
+}
 
 int main(int argc, char *argv[])
 {
+    signal(SIGPIPE, sigpipe_handler);
     if (argc < 3)
     {
         printf("Usage: %s [port] [port]\n", argv[0]);
@@ -196,10 +202,13 @@ int main(int argc, char *argv[])
     pthread_t udp_thread;
     pthread_create(&udp_thread, NULL, udp_thread_routine, udp_listen_port);
 
+    // listen for tcp connections
     while (1)
     {
         sin_size = sizeof(their_addr);
-        tcp_connection_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
+        int tcp_connection_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
+        connections[num_connections++] = tcp_connection_fd;
+
         printf("tcp connection accepted on fd: %d", tcp_connection_fd);
         printf("thread_index: %d\n", thread_index);
 
@@ -212,6 +221,7 @@ int main(int argc, char *argv[])
         // create new threads to handle tcp connections
         if (thread_index < MAX_THREADS)
         {
+            // create a new thread
             pthread_create(&threads[thread_index], NULL, thread_routine, (void *)&tcp_connection_fd);
             ++thread_index;
             fflush(stdout);
@@ -220,6 +230,7 @@ int main(int argc, char *argv[])
         {
             // no more threads available, wait for an existing thread to finish
             pthread_join(threads[thread_index % MAX_THREADS], NULL);
+            memset(threads, 0, sizeof(pthread_t) * MAX_THREADS);
             thread_index = 0;
             pthread_create(&threads[thread_index % MAX_THREADS], NULL, thread_routine, (void *)&tcp_connection_fd);
         }
@@ -235,10 +246,17 @@ void child_routine(int connect_fd)
 {
     printf("my pid is %d: \n", getpid());
     printf("my tid is %d: \n", pthread_self());
+    fflush(stdout);
     // packet receive data buffer (from http request)
-    char buffer[1024];
+    char buffer[1024 + 1];
     int numbytes;
     numbytes = recv(connect_fd, buffer, sizeof(buffer), 0);
+    if(numbytes <= 0) {
+        // connection closed
+        exit(0);
+        // return;
+    }
+
     buffer[numbytes] = '\0'; // what if numbytes is 1024????
 
     // processing the HTTP start-line
@@ -251,15 +269,15 @@ void child_routine(int connect_fd)
 
     // using strtok to tokenize the request
     process_startline(request, &method, &path, &version);
+    printf("method: %s path: %s version: %s \n", method, path, version);
+    fflush(stdout);
 
     char path_peer_copy[100];
     strncpy(path_peer_copy, path, sizeof(path_peer_copy));
 
-    printf("init copy %s\n", path_peer_copy);
     if (strlen(path_peer_copy) > 1)
     {
         process_peer_path(path_peer_copy, connect_fd, buffer); // <<<<******************************************************************************************************************************************************
-        printf("here-1\n");
     }
     /*
     char pathstr[strlen(path) + 1];
@@ -347,26 +365,20 @@ void *udp_thread_routine(int *arg)
     memset(&addr, '\0', sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(udp_listen_port);
-    addr.sin_addr.s_addr = inet_addr(ip);
+    addr.sin_addr.s_addr = INADDR_ANY;
 
     udp_connection_fd = sockfd; // set global udp_connection_fd
 
     // download_file(sockfd, addr);
     int retries = 0;
+
+    // RATE LIMITING
+    struct timeval start_time, current_time;
+    gettimeofday(&start_time, NULL);
+    int packet_num = 0;
     while (1)
     {
-        
-        udp_to_tcp_client();
-        // break; // break out of loop when synack is received to receive file
-        // send out file chunk to tcp client
-        // close tcp connection?
-
-        // read connection id from packet
-        // get the tcp_connection_fd from the hash table
-        // send the file chunk to the tcp client
-        // do i need to cleanup? close the tcp connection?
-
-        // send ack for the next chunk? maybe not
+        udp_to_tcp_client(&packet_num, start_time, current_time);
     }
 
     return 0;
@@ -444,7 +456,7 @@ char** str_split(char* a_str, const char a_delim)
     return result;
 }
 
-void udp_to_tcp_client() {
+void udp_to_tcp_client(int *packet_count, struct timeval start_time, struct timeval current_time) {
     int sockfd = udp_connection_fd;
 
     Packet file_packet = {
@@ -456,17 +468,17 @@ void udp_to_tcp_client() {
         .end_byte = 0,
         .packet_number = 0,
         .packet_data_size = 0,
+        .orig_has_range = false,
+        .content_length = 0,
         .packet_data = ""
     };
     struct sockaddr *server_addr;
     socklen_t addr_size;
     addr_size = sizeof(server_addr);
-
+    
     int n_bytes = recvfrom_timeout(sockfd, &file_packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, &addr_size, 1);
     if (n_bytes == 0)
     {
-        printf("[-] Timeout, waiting again\n");
-        fflush(stdout);
         return;
     }
     else if (n_bytes == -1)
@@ -477,47 +489,89 @@ void udp_to_tcp_client() {
     }
     else
     {   
-        printf("[+] Received packet %d of size %d bytes\n", file_packet.packet_number, file_packet.packet_data_size);
-        printf(
-            "file_packet received: %s %s %d %s %d %d %d %d %d\n",
-            file_packet.connection_id,
-            file_packet.packet_type,
-            file_packet.ack_number,
-            file_packet.file_path,
-            file_packet.start_byte,
-            file_packet.start_byte,
-            file_packet.end_byte,
-            file_packet.packet_number,
-            file_packet.packet_data_size
-        );
-        fflush(stdout);
-        // SEND FILE CHUNK TO TCP CLIENT
-        // char **tokens = str_split(file_packet.connection_id, " ");
-        // char *tcp_connection_id = tokens[0];
-        // int client_sockfd = atoi(*tcp_connection_id);
+        // RATE LIMITING
+        // Get the current time
+        gettimeofday(&current_time, NULL);
+        char *rate_str = get_rate_of_path(file_packet.file_path, peers_list, 7);
+        int rate_limit = atoi(rate_str); // Bytes per second
+        printf("[+] Rate limit: %d\n", rate_limit);
+
+        double bytes_sent = *packet_count * 1024.0; // convert packet count to bytes
+        double sleep_time = 0.0; // time to sleep in seconds
+        if (bytes_sent > rate_limit) {
+            sleep_time = (bytes_sent - rate_limit) / rate_limit;
+        }
+
+        // Check if the rate limit has been exceeded
+        *packet_count += 1;
+        if (current_time.tv_usec - start_time.tv_usec >= 1 && sleep_time > 0) {
+            int sleep_time_ns = (int)(sleep_time * 1000000000); // convert sleep time to nanoseconds
+            printf("[+] Rate limit exceeded, sleeping for %f seconds, %d packets\n", sleep_time, *packet_count);
+            fflush(stdout);
+            nano_sleep(sleep_time_ns);
+            gettimeofday(&start_time, NULL);
+            *packet_count = 0;
+        }
+
+
+
+        // GET TCP CLIENT SOCKET FD
         char *token = strtok(file_packet.connection_id, " ");
         fflush(stdout);
-        // int client_sockfd = *(int*)atoi(token);
         int client_sockfd;
         sscanf(token, "%d", &client_sockfd);
         fflush(stdout);
-        
-        while(1) {
-            int s = send(client_sockfd, file_packet.packet_data, sizeof(file_packet.packet_data), 0);
-            if (s == -1)
-            {
-                printf("[-] Error sending file chunk to tcp client\n");
+
+        // IF SYNACK #1, SEND APPRPRIATE HEADERS
+        if (file_packet.packet_number == 0) {
+            char content_type[200];
+            char *filename, *filetype;
+            char *filepath = file_packet.file_path;
+            long content_length = file_packet.content_length;
+
+            parse_http_uri(filepath, &filename, &filetype);
+            int is_video_transfer = content_type_lookup(content_type, filetype);
+
+            if(file_packet.orig_has_range) {
+                printf("[+] Sending 206 Partial Content, content_length = %d\n", content_length);
                 fflush(stdout);
-                // return;
-            }
-            else
-            {
-                printf("[+] Sent file chunk to tcp client\n");
-                fflush(stdout);
-                break;
+                int sent = send_http_206_partial_content(client_sockfd, content_type, content_length, file_packet.start_byte, file_packet.end_byte);
+                if (sent < 0) {
+                    remove_socket(client_sockfd);
+                    return;
+                }
+
+            } else {
+                send_http_200_no_range(client_sockfd, content_type, content_length);
             }
         }
-        // sleep(1);
+
+        // printf("[+] Received packet %d of size %d bytes\n", file_packet.packet_number, file_packet.packet_data_size);
+        // print_packet(&file_packet, "Received Packet from UDP Server\n");
+        fflush(stdout);
+        
+        
+        // SEND FILE CHUNK TO TCP CLIENT
+
+            int is_socket_avail = is_socket_in_array(client_sockfd);
+            if(is_socket_avail == 0) {
+                return;
+            }
+
+            int s = send(client_sockfd, file_packet.packet_data, sizeof(file_packet.packet_data), 0);
+
+            if(s < 0) {
+                if (errno == EPIPE) {
+                    printf("send failed: Broken pipe\n");
+                    fflush(stdout);
+                } else {
+                    printf("send failed: %s\n", strerror(errno));
+                    fflush(stdout);
+                }
+                close(client_sockfd);
+                remove_socket(client_sockfd);
+                return;
+            }
 
         // stop action if file is done
         if (file_packet.packet_data_size < PACKET_DATA_SIZE) {
@@ -526,40 +580,87 @@ void udp_to_tcp_client() {
             printf("File is done\n");
             fflush(stdout);
             return;
+            // exit(0);
         }
+
 
         // SEND ACK TO UDP SERVER
         Packet ack_packet = {
             .connection_id = "",
-            .packet_type = "",
+            .packet_type = "ack",
             .ack_number = 0,
             .file_path = "",
-            .start_byte = 0, // *********************
+            .start_byte = 0,
             .end_byte = 0,
             .packet_number = 0,
             .packet_data_size = 0,
+            .orig_has_range = false,
+            .content_length = 0,
             .packet_data = ""
         };
         duplicate_packet(&ack_packet, &file_packet);
         ack_packet.ack_number += 1;
         ack_packet.packet_number += 1;
         ack_packet.start_byte += PACKET_DATA_SIZE;
+
         int sent = sendto(sockfd, (char*) &ack_packet, sizeof(Packet), 0, (struct sockaddr*)&server_addr, addr_size);
         if (sent == -1) {
             printf("[-] Error\n");
             fflush(stdout);
             return;
         }
+
     }
 }
 
 void duplicate_packet(Packet *packet1, Packet *packet2) {
-    packet1->packet_number = packet2->packet_number;
+    strcpy(packet1->connection_id, packet2->connection_id);
+    strcpy(packet1->packet_type, packet2->packet_type);
     packet1->ack_number = packet2->ack_number;
+    strcpy(packet1->file_path, packet2->file_path);
     packet1->start_byte = packet2->start_byte;
     packet1->end_byte = packet2->end_byte;
+    packet1->packet_number = packet2->packet_number;
     packet1->packet_data_size = packet2->packet_data_size;
-    strcpy(packet1->packet_type, packet2->packet_type);
-    strcpy(packet1->connection_id, packet2->connection_id);
-    strcpy(packet1->file_path, packet2->file_path);
+    packet1->orig_has_range = packet2->orig_has_range;
+    packet1->content_length = packet2->content_length;
+}
+
+int remove_socket(int sockfd) {
+    for (int i = 0; i < num_connections; i++) {
+        if (connections[i] == sockfd) {
+            // Close the socket and remove it from the list
+            close(connections[i]);
+            connections[i] = connections[--num_connections];
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int is_socket_in_array(int sockfd) {
+    for (int i = 0; i < num_connections; i++) {
+        if (connections[i] == sockfd) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void nano_sleep(int nanoseconds) {
+    struct timespec sleep_time;
+    sleep_time.tv_sec = 0;
+    sleep_time.tv_nsec = nanoseconds;
+
+    // Use nanosleep to sleep for the specified number of nanoseconds
+    nanosleep(&sleep_time, NULL);
+}
+
+char *get_rate_of_path(const char *path, struct peer_url *peers_list, int num_peers) {
+  for (int i = 0; i < num_peers; i++) {
+    if (strcmp(path, peers_list[i].path) == 0) {
+      return peers_list[i].rate;
+    }
+  }
+  return NULL;
 }

@@ -2,7 +2,11 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <limits.h>
+#include <fcntl.h>
 #include "http_utils.h"
+
+#define BUFSIZE 4096
+
 
 void generate_timestamp(char *buf)
 {
@@ -314,4 +318,45 @@ int send_http_206_partial_content(int connection_fd, char *content_type, long fi
                         "Connection: Keep-Alive\r\n\r\n",
                         range_start, range_end, file_size, content_type, file_size, date_timestamp, date_timestamp);
     return send(connection_fd, message, strlen(message), 0);
+}
+
+void send_html_from_file(int connection_fd, char *filename)
+{
+    char *content_type = "text/html";
+    int fd = open(filename, O_RDONLY);
+    if (fd == -1)
+    {
+        send_http_404(connection_fd);
+        return;
+    }
+
+    struct stat file_stat;
+    if (fstat(fd, &file_stat) < 0)
+    {
+        close(fd);
+        send_http_404(connection_fd);
+        return;
+    }
+
+    char headers[1000];
+    char last_modified[100];
+
+    struct tm timeinfo;
+    localtime_r(&file_stat.st_mtime, &timeinfo);
+    strftime(last_modified, sizeof last_modified, "%a, %d %b %Y %H:%M:%S %Z", &timeinfo);
+
+    sprintf(headers, "HTTP/1.1 200 OK\r\nContent-Type: %s\r\n"
+                     "Content-Length: %ld\r\nLast-Modified: %s\r\n\r\n",
+            content_type, file_stat.st_size, last_modified);
+
+    send(connection_fd, headers, strlen(headers), 0);
+
+    char buf[BUFSIZE];
+    ssize_t n;
+    while ((n = read(fd, buf, BUFSIZE)) > 0)
+    {
+        send(connection_fd, buf, n, 0);
+    }
+
+    close(fd);
 }

@@ -16,38 +16,39 @@
 
 extern struct HashMap *sockets_map;
 extern int udp_connection_fd;
+extern int global_rate_limit;
 
 int peers_count = 0;
 
 struct peer_url peers_list[100] = {
-    {.path = "video/sample4.ogg",
-     .host = "localhost",
-     .port = "8347",
-     .rate = "100000"},
-    {.path = "video/big_buck_bunny_480p_stereo.ogg",
-     .host = "localhost",
-     .port = "8347",
-     .rate = "56024"},
-    {.path = "video/video.ogg",
-     .host = "localhost",
-     .port = "8347",
-     .rate = "100000"},
-    {.path = "video/trailer_400p.ogg",
-     .host = "localhost",
-     .port = "8347",
-     .rate = "100000"},
-    {.path = "video/Firefox_Final_VO.ogv",
-     .host = "localhost",
-     .port = "8347",
-     .rate = "100000"},
-     {.path = "video/video.webm",
-     .host = "localhost",
-     .port = "8347",
-     .rate = "100000"},
-     {.path = "video/sample-30s.webm",
-     .host = "localhost",
-     .port = "8347",
-     .rate = "56024"}
+    // {.path = "video/sample4.ogg",
+    //  .host = "localhost",
+    //  .port = "8347",
+    //  .rate = "100000"},
+    // {.path = "video/big_buck_bunny_480p_stereo.ogg",
+    //  .host = "localhost",
+    //  .port = "8347",
+    //  .rate = "56024"},
+    // {.path = "video/video.ogg",
+    //  .host = "localhost",
+    //  .port = "8347",
+    //  .rate = "100000"},
+    // {.path = "video/trailer_400p.ogg",
+    //  .host = "localhost",
+    //  .port = "8347",
+    //  .rate = "100000"},
+    // {.path = "video/Firefox_Final_VO.ogv",
+    //  .host = "localhost",
+    //  .port = "8347",
+    //  .rate = "100000"},
+    //  {.path = "video/video.webm",
+    //  .host = "localhost",
+    //  .port = "8347",
+    //  .rate = "100000"},
+    //  {.path = "video/sample-30s.webm",
+    //  .host = "localhost",
+    //  .port = "8347",
+    //  .rate = "56024"}
 };
 
 void add_peer_to_list(struct peer_url peer);
@@ -286,7 +287,13 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
         strcpy(peer.path, add_info.path);
         strcpy(peer.host, add_info.host);
         strcpy(peer.port, add_info.port);
-        strcpy(peer.rate, add_info.rate);
+        if(add_info.rate != NULL){
+            strcpy(peer.rate, add_info.rate);
+        }
+        else{
+            strcpy(peer.rate, "0");
+        }
+        // strcpy(peer.rate, add_info.rate);
         // peer.path = add_info.path;
         // peer.host = add_info.host;
         // peer.port = add_info.port;
@@ -302,7 +309,8 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
         add_peer_to_list(peer);
         print_peers_list();
 
-        send_http_200(connect_fd);
+        // send_http_200(connect_fd);
+        send_html_from_file(connect_fd, "html/peer_add.html");
         // exit(0);
         return;
     }
@@ -326,7 +334,8 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
         if (peer == NULL)
         {
             printf("peer not found\n");
-            send_http_404(connect_fd);
+            // send_http_404(connect_fd);
+            send_html_from_file(connect_fd, "html/not_found.html");
             return;
         }
 
@@ -431,7 +440,7 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
         // );
         printf("ack_packet before sent:\n");
         ;
-        print_packet(&ack_packet, "ack_packet before sent");
+        // print_packet(&ack_packet, "ack_packet before sent");
         fflush(stdout);
 
         int s = sendto(udp_connection_fd, (char *)&ack_packet, sizeof(Packet), 0, (struct sockaddr *)&addr, sizeof(addr));
@@ -492,8 +501,9 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
         // ********************************
         // PERFORM /PEER/CONFIG work here
         // ********************************
-
-        send_http_200(connect_fd);
+        global_rate_limit = atoi(rate);
+        send_html_from_file(connect_fd, "html/config.html");
+        // send_http_200(connect_fd);
         // exit(0);
         return;
     }
@@ -505,7 +515,7 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
         // PERFORM /PEER/STATUS work here
         // ********************************
 
-        send_http_200(connect_fd);
+        // send_http_200(connect_fd);
         // exit(0);
         return;
     }

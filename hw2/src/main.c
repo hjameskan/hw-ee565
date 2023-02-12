@@ -31,6 +31,7 @@
 
 extern int peers_count;
 extern struct peer_url peers_list[100];
+int global_rate_limit;
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -489,27 +490,37 @@ void udp_to_tcp_client(int *packet_count, struct timeval start_time, struct time
     }
     else
     {   
-        // RATE LIMITING
-        // Get the current time
-        gettimeofday(&current_time, NULL);
+        // // RATE LIMITING
+        // // Get the current time
+        // gettimeofday(&current_time, NULL);
         char *rate_str = get_rate_of_path(file_packet.file_path, peers_list, 7);
         int rate_limit = atoi(rate_str); // Bytes per second
+        int rate_limit_to_use = global_rate_limit == NULL ? rate_limit : global_rate_limit;
+
         // printf("[+] Rate limit: %d\n", rate_limit);
 
-        double bytes_sent = *packet_count * 1024.0; // convert packet count to bytes
-        double sleep_time = 0.0; // time to sleep in seconds
-        if (bytes_sent > rate_limit) {
-            sleep_time = (bytes_sent - rate_limit) / rate_limit;
-        }
+        // double bytes_sent = *packet_count * 1024.0; // convert packet count to bytes
+        // double sleep_time = 0.0; // time to sleep in seconds
+        // if (bytes_sent > rate_limit) {
+        //     sleep_time = (bytes_sent - rate_limit) / rate_limit;
+        // }
 
-        // Check if the rate limit has been exceeded
+        // // Check if the rate limit has been exceeded
+        // *packet_count += 1;
+        // if (current_time.tv_usec - start_time.tv_usec >= 1 && sleep_time > 0) {
+        //     int sleep_time_ns = (int)(sleep_time * 1000000000); // convert sleep time to nanoseconds
+        //     printf("[+] Rate limit exceeded, sleeping for %f seconds, %d packets\n", sleep_time, *packet_count);
+        //     fflush(stdout);
+        //     nano_sleep(sleep_time_ns);
+        //     gettimeofday(&start_time, NULL);
+        //     *packet_count = 0;
+        // }
+
         *packet_count += 1;
-        if (current_time.tv_usec - start_time.tv_usec >= 1 && sleep_time > 0) {
-            int sleep_time_ns = (int)(sleep_time * 1000000000); // convert sleep time to nanoseconds
-            printf("[+] Rate limit exceeded, sleeping for %f seconds, %d packets\n", sleep_time, *packet_count);
+        if(*packet_count > rate_limit_to_use && rate_limit_to_use > 0) {
+            printf("[+] Rate limit exceeded, sleeping for 1 second, %d packets\n", *packet_count);
             fflush(stdout);
-            nano_sleep(sleep_time_ns);
-            gettimeofday(&start_time, NULL);
+            sleep(1);
             *packet_count = 0;
         }
 

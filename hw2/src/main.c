@@ -221,7 +221,7 @@ void child_routine(int connect_fd) {
     // if the pathstr specifies actual content, further processing of the
     // URI string is required
     parse_http_uri(path, &filename, &filetype);
-    //printf("[INFO] filename: %s, filetype: %s\n", filename, filetype);
+    // printf("[INFO] filename: %s, filetype: %s\n", filename, filetype);
 
     char file_location[sizeof("/content") + sizeof(path)] = "./content";
     strcat(file_location, path);

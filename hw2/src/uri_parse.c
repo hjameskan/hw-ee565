@@ -22,7 +22,7 @@ void parse_http_uri(const char *path, char **filename, char **filetype) {
     char path_string[strlen(path) + 1];
     char *path_tok, *path_tok_prev;
 
-    strcpy(path_string, path); // copy of path string for parsing out the filename
+    strcpy(path_string, path); // b of path string for parsing out the filename
 
     path_tok = strtok(path_string, "/");
 
@@ -235,7 +235,8 @@ void process_peer_path(char *path_string, int connect_fd) {
         // ********************************
         // PERFORM /PEER/ADD work here
         // ********************************
-        add_peer_to_list(add_info.path, add_info.host, add_info.port, add_info.rate);
+        add_peer_to_list(add_info.path, add_info.host,  add_info.port,  add_info.rate);
+
 
         send_http_200(connect_fd);
         exit(0);
@@ -249,7 +250,18 @@ void process_peer_path(char *path_string, int connect_fd) {
         // ********************************
         // PERFORM /PEER/VIEW work here
         // ********************************
-        send_peer_list(content_path, connect_fd);
+        char *peer_list ;
+        sprintf(peer_list, "HTTP/1.1 200 OK\r\n");
+        send(connect_fd, peer_list, strlen(peer_list), 0);
+        char *filename, *filetype;
+        parse_http_uri(content_path, &filename, &filetype);
+
+        char content_type[100];
+        int video_transfer = content_type_lookup(content_type, filetype);
+
+        // Serve the requested file
+        transfer_file_chunk(connect_fd, filename, content_type, video_transfer);
+
 
         send_http_200(connect_fd); // note: for now we will send a 200 response
         exit(0);                   // but later, we will need to provide requested content
@@ -275,44 +287,7 @@ void process_peer_path(char *path_string, int connect_fd) {
         // ********************************
         // PERFORM /PEER/CONFIG work here
         // ********************************
-        // 1. Prepare a message to send to a remote peer
-        char message[100];
-        sprintf(message, "Configuring rate to %d\n", rate);
-
-        // 2. Connect to the remote peer
-        int sock_fd = connect_to_peer(add_info.host, add_info.port);
-        if (sock_fd == -1) {
-            printf("Failed to connect to peer\n");
-            send_http_500(connect_fd);
-            exit(1);
-        }
-
-        // 3. Send the message to the remote peer
-        int num_sent = send(sock_fd, message, strlen(message), 0);
-        if (num_sent == -1) {
-            printf("Failed to send message\n");
-            send_http_500(connect_fd);
-            exit(1);
-        }
-
-        // 4. Receive a response from the remote peer
-        char response[100];
-        int num_received = recv(sock_fd, response, 100, 0);
-        if (num_received == -1) {
-            printf("Failed to receive response\n");
-            send_http_500(connect_fd);
-            exit(1);
-        }
-
-        // 5. Log the response from the remote peer
-        printf("Response from peer: %s\n", response);
-
-        // 6. Send an HTTP 200 response to the client
-        send_http_200(connect_fd);
-
-        // 7. Close the connection to the remote peer
-        close(sock_fd);
-        exit(0);
+        
     }
     else if (strcmp(peer_cmd, "status" ) == 0) {
         printf("/peer/status parsed!\n");
@@ -320,12 +295,8 @@ void process_peer_path(char *path_string, int connect_fd) {
         // ********************************
         // PERFORM /PEER/STATUS work here
         // ********************************
-        int peer_status = get_peer_status();
-        if (peer_status == 0) {
-            send_http_200(connect_fd);
-        } else {
-            send_http_500(connect_fd);
-        }
+
+        send_http_200(connect_fd);
         exit(0);
     }
 

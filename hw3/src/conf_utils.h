@@ -66,7 +66,7 @@ char* get_config_value_by_key(node_config *config, const char *key);
 
 char* get_config_value_by_key_json(node_config *config, const char *key, bool pretty);
 
-void add_peer_from_string(node_config *config, const char *peer_string);
+int add_peer_from_string(node_config *config, const char *peer_string);
 
 node_config* json_to_node_config(char* json_str);
 

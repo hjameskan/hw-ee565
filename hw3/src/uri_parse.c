@@ -575,9 +575,10 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
         char peer_string_extra[256];
         printf("peer_string:|%s|END\n", peer_string);
 
-        add_peer_from_string(&global_config, peer_string);
+        int err = add_peer_from_string(&global_config, peer_string);
+        if (err == -1) {send_str(connect_fd, "Error: add_peer_from_string error"); return;}
+
         send_json_str(connect_fd, get_config_value_by_key_json(&global_config, "peers", false));
-        printf("HERE \n");
         return;
     }
     else if (strcmp(peer_cmd, "kill") == 0)

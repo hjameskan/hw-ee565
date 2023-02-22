@@ -317,7 +317,7 @@ char* get_config_value_by_key_json(node_config *config, const char *key, bool pr
     return pretty ? cJSON_Print(root) : cJSON_PrintUnformatted(root);
 }
 
-void add_peer_from_string(node_config *config, const char *peer_string) {
+int add_peer_from_string(node_config *config, const char *peer_string) {
     // Parse the peer data from the input string
     char uuid[37];
     char host[256];
@@ -330,14 +330,14 @@ void add_peer_from_string(node_config *config, const char *peer_string) {
     if (parsed != 5) {
         // Failed to parse the input string
         fprintf(stderr, "Error: Invalid peer string format\n");
-        return;
+        return -1;
     }
     
     // Add the new peer to the config
     if (config->peer_count >= MAX_PEERS) {
         // Reached the maximum number of peers
         fprintf(stderr, "Error: Maximum number of peers reached\n");
-        return;
+        return -1;
     }
     config->peers[config->peer_count] = (peer_info) {
         "none",
@@ -360,6 +360,45 @@ void add_peer_from_string(node_config *config, const char *peer_string) {
     
     config->peer_count++;
     printf("config->peer_count: %d \n", config->peer_count);
+
+    // also update network map
+    node_config *peer_config = {
+        peer->uuid,
+        "",
+        peer->name,
+        peer->host,
+        peer->frontend_port,
+        peer->backend_port,
+        "",
+        peer->weight,
+        false,
+        0,
+        NULL,
+        0,
+        NULL
+    };
+    /*
+    typedef struct {
+        char uuid[64];
+        char last_seen[64];
+        char name[256];
+        char host[256];
+        int frontend_port;
+        int backend_port;
+        char content_dir[256];
+        int weight;
+        bool is_online;
+        int num_file_paths;
+        char **file_paths;
+        int peer_count;
+        peer_info peers[MAX_PEERS];
+    } node_config;
+    */
+    // update_network_map(network_map, peer_config);
+    // get json then update?
+
+
+    return 0;
 }
 
 node_config* json_to_node_config(char* json_str) {

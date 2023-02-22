@@ -1,0 +1,8 @@
+uuid = 47026E2B-AC3D-4B9B-A478-FB7F65076275
+name = node1
+frontend_port = 18345
+backend_port = 18346
+content_dir = content/
+peer_count = 2
+peer_0 = 24f22a83-16f4-4bd5-af63-b5c6e979dbb,pi.ece.cmu.edu,18345,18346,10
+peer_1 = 3d2f4e34-6d21-4dda-aa78-796e3507903c,mu.ece.cmu.edu,18345,18346,20

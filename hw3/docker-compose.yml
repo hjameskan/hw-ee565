@@ -1,0 +1,24 @@
+version: '3.9'
+services:
+  web:
+    image: my-ubuntu:latest
+    ports:
+      - "8345:8345"
+      - "8346:8346"
+      - "8347:8347"
+    container_name: hw3
+    command: ["./container-startup.sh"]
+    volumes:
+      - .:/hw3
+    working_dir: /hw3
+  web2:
+    image: my-ubuntu:latest
+    ports:
+      - "8348:8345"
+      - "8349:8346"
+      - "8350:8347"
+    container_name: hw3_2
+    command: ["./container-startup.sh"]
+    volumes:
+      - .:/hw3
+    working_dir: /hw3

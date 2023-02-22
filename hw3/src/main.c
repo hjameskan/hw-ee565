@@ -442,7 +442,6 @@ void child_routine(int connect_fd)
                 fflush(stdout);
                 return;
             }
-
             // update peer to network map ----------------------------------------------------
             update_network_map(network_map, peer_config);
             // hash_table_update_node_config(network_map, peer_config->uuid, peer_config);
@@ -453,7 +452,6 @@ void child_routine(int connect_fd)
 
             // char *peer_config_str = node_config_to_json(peer_config, false);
             // printf("peer_config_str: %s \n", peer_config_str);
-
             // get this peer's network map
             hash_table *ht = node_config_to_hashmap(peer_config, 0);
 

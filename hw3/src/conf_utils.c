@@ -377,6 +377,7 @@ int add_peer_from_string(node_config *config, const char *peer_string) {
         0,
         NULL
     };
+    
     /*
     typedef struct {
         char uuid[64];
@@ -626,7 +627,7 @@ void update_peer_weights_last_seen(node_config *config, hash_table *ht, char *pe
                 }
                 peer_info *new_peer = &config->peers[config->peer_count++];
                 strcpy(new_peer->uuid, peer->uuid);
-                strcpy(new_peer->last_seen, peer->last_seen);
+                strcpy(new_peer->last_seen, "");
                 strcpy(new_peer->name, peer->name);
                 strcpy(new_peer->host, peer->host);
                 new_peer->frontend_port = peer->frontend_port;

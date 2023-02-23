@@ -480,8 +480,6 @@ void child_routine(int connect_fd)
                 addr_ptr = &((struct sockaddr_in6 *)&addr)->sin6_addr;
             }
             inet_ntop(addr.ss_family, addr_ptr, ip_str, sizeof(ip_str));
-            printf("Connected to peer with IP address: %s\n", ip_str);
-            // strcpy(peer_config->host, "::1");
             strcpy(peer_config->host, ip_str);
             send_str(connect_fd, node_config_to_json(&global_config, false));
             // close(connect_fd);

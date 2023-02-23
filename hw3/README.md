@@ -15,9 +15,13 @@ Go to the directory: `hw3`, execute:
 ```
 make clean && make && ./vodserver $(port1) $(port2)
 ```
-
 <br />
 
+You can see how to test the url requests [by clicking here](#http-server)
+
+<br /><br />
+
+# Code Architecture #
 ![This is the architecture](design/architecture.png)
 <br/><br/>
 # TCP Peer Checker #
@@ -28,8 +32,8 @@ Upon receiving the network update, each server records the time of connection. T
 
 <br/><br/>
 
-
-# HTTP Server #
+<a id="http-server"></a>
+# HTTP Server # 
 ```
 /peer/uuid
 ```

@@ -462,25 +462,28 @@ void child_routine(int connect_fd)
             strftime(last_seen_str, sizeof(last_seen_str), "%Y-%m-%d %H:%M:%S", localtime(&current_time));
             strcpy(peer_config->last_seen, last_seen_str);
 
-            // set client host to client ip
-            // retrieve peer address
-            struct sockaddr_storage addr;
-            socklen_t addr_len = sizeof(addr);
-            if (getpeername(connect_fd, (struct sockaddr *)&addr, &addr_len) == -1) {
-                perror("getpeername");
-                exit(1);
+            if(hash_table_get(network_map, peer_config->uuid) == NULL) {
+                // record peer IP address if no record
+                struct sockaddr_storage addr;
+                socklen_t addr_len = sizeof(addr);
+                char ip_str[INET6_ADDRSTRLEN];
+                void *addr_ptr;
+                if (getpeername(connect_fd, (struct sockaddr *)&addr, &addr_len) == -1) {
+                    perror("getpeername");
+                    exit(1);
+                }
+                if (addr.ss_family == AF_INET) { // IPv4 address
+                    addr_ptr = &((struct sockaddr_in *)&addr)->sin_addr;
+                } else { // IPv6 address
+                    addr_ptr = &((struct sockaddr_in6 *)&addr)->sin6_addr;
+                }
+                inet_ntop(addr.ss_family, addr_ptr, ip_str, sizeof(ip_str));
+                
+                strcpy(peer_config->host, ip_str);
+            } else {
+                // no need for action
             }
 
-            // print peer address
-            char ip_str[INET6_ADDRSTRLEN];
-            void *addr_ptr;
-            if (addr.ss_family == AF_INET) { // IPv4 address
-                addr_ptr = &((struct sockaddr_in *)&addr)->sin_addr;
-            } else { // IPv6 address
-                addr_ptr = &((struct sockaddr_in6 *)&addr)->sin6_addr;
-            }
-            inet_ntop(addr.ss_family, addr_ptr, ip_str, sizeof(ip_str));
-            strcpy(peer_config->host, ip_str);
             send_str(connect_fd, node_config_to_json(&global_config, false));
             // close(connect_fd);
 

@@ -161,6 +161,7 @@ char* node_config_to_json(node_config *config, bool is_formatted) {
 
     // Add the UUID
     cJSON_AddStringToObject(root, "uuid", config->uuid);
+    cJSON_AddStringToObject(root, "last_seen", config->last_seen);
 
     // Add the name
     cJSON_AddStringToObject(root, "name", config->name);
@@ -187,6 +188,7 @@ char* node_config_to_json(node_config *config, bool is_formatted) {
 
         // Add the UUID
         cJSON_AddStringToObject(peer_obj, "uuid", config->peers[i].uuid);
+        cJSON_AddStringToObject(peer_obj, "last_seen", config->peers[i].last_seen);
 
         // Add the hostname
         cJSON_AddStringToObject(peer_obj, "name", config->peers[i].name);
@@ -323,8 +325,6 @@ int add_peer_from_string(node_config *config, const char *peer_string) {
     char host[256];
     int frontend_port, backend_port, weight;
     printf("peer_string: %s \n", peer_string);
-    // int parsed = sscanf(peer_string, "uuid=%36[^&]&host=%255[^&]&frontend=%d&backend=%d&metric=%d",
-    //                     uuid, host, &frontend_port, &backend_port, &weight);
     int parsed = sscanf(peer_string, "/peer/addneighbor?uuid=%36[^&]&host=%255[^&]&frontend=%d&backend=%d&metric=%d",
                         uuid, host, &frontend_port, &backend_port, &weight);
     if (parsed != 5) {
@@ -339,6 +339,14 @@ int add_peer_from_string(node_config *config, const char *peer_string) {
         fprintf(stderr, "Error: Maximum number of peers reached\n");
         return -1;
     }
+    for (int i = 0; i < config->peer_count; i++) {
+        if (strcmp(config->peers[i].uuid, uuid) == 0) {
+            fprintf(stderr, "Error: UUID for neighbor already exists\n");
+            return -2;
+        }
+    }
+
+    // This part is for updating the *config peers 
     config->peers[config->peer_count] = (peer_info) {
         "none",
         "",
@@ -347,69 +355,83 @@ int add_peer_from_string(node_config *config, const char *peer_string) {
         0,
         0
     };
-    printf("config->peers[config->peer_count]: %s \n", config->peers[config->peer_count].uuid);
+    // printf("config->peers[config->peer_count]: %s \n", config->peers[config->peer_count].uuid);
     peer_info *peer = &config->peers[config->peer_count];
-    printf("peer->uuid: %s \n", peer->uuid);
+    // printf("peer->uuid: %s \n", peer->uuid);
     strncpy(peer->uuid, uuid, sizeof(peer->uuid));
     strncpy(peer->name, "", sizeof(peer->name));  // Not provided in input string
     strncpy(peer->host, host, sizeof(peer->host));
     peer->frontend_port = frontend_port;
     peer->backend_port = backend_port;
     peer->weight = weight;
-    printf("peer->uuid: %s \n", peer->uuid);
+    // printf("peer->uuid: %s \n", peer->uuid);
     
     config->peer_count++;
-    printf("config->peer_count: %d \n", config->peer_count);
-
-    // also update network map
-    node_config *peer_config = {
-        peer->uuid,
-        "",
-        peer->name,
-        peer->host,
-        peer->frontend_port,
-        peer->backend_port,
-        "",
-        peer->weight,
-        false,
-        0,
-        NULL,
-        0,
-        NULL
-    };
-    
-    /*
-    typedef struct {
-        char uuid[64];
-        char last_seen[64];
-        char name[256];
-        char host[256];
-        int frontend_port;
-        int backend_port;
-        char content_dir[256];
-        int weight;
-        bool is_online;
-        int num_file_paths;
-        char **file_paths;
-        int peer_count;
-        peer_info peers[MAX_PEERS];
-    } node_config;
-    */
-    // update_network_map(network_map, peer_config);
-    // get json then update?
-
 
     return 0;
 }
 
-node_config* json_to_node_config(char* json_str) {
-    // Get current time as time_t
-    time_t current_time = time(NULL);
+node_config* url_path_to_config(char *url_path) {
+    // Parse the peer data from the input string
+    char uuid[37];
+    char host[256];
+    int frontend_port, backend_port, weight;
+    int parsed = sscanf(url_path, "/peer/addneighbor?uuid=%36[^&]&host=%255[^&]&frontend=%d&backend=%d&metric=%d",
+                        uuid, host, &frontend_port, &backend_port, &weight);
+    if (parsed != 5) {
+        // Failed to parse the input string
+        fprintf(stderr, "Error: Invalid peer string format\n");
+        return -1;
+    }
 
-    // Convert time_t to string
-    char last_seen_str[20];
-    strftime(last_seen_str, sizeof(last_seen_str), "%Y-%m-%d %H:%M:%S", localtime(&current_time));
-    
+    // This part is for the network map
+    // Create a new JSON object
+    cJSON *json = cJSON_CreateObject();
+    if (json == NULL) {
+        printf("Failed to create JSON object\n");
+        return 1;
+    }
+
+    // Add each field to the JSON object
+    cJSON_AddStringToObject(json, "uuid", uuid);
+    cJSON_AddStringToObject(json, "last_seen", "");
+    cJSON_AddStringToObject(json, "name", "");
+    cJSON_AddStringToObject(json, "host", host);
+    cJSON_AddNumberToObject(json, "frontend_port", frontend_port);
+    cJSON_AddNumberToObject(json, "backend_port", backend_port);
+    cJSON_AddNumberToObject(json, "weight", weight);
+
+    cJSON *file_paths_array = cJSON_CreateArray();
+    if (file_paths_array == NULL) {
+        printf("Failed to create JSON array\n");
+        return 1;
+    }
+
+    // Add each file path to the file_paths_array
+    // for (int i = 0; i < peer->num_file_paths; i++) {
+    //     cJSON_AddItemToArray(file_paths_array, cJSON_CreateString(peer->file_paths[i]));
+    // }
+
+    cJSON_AddItemToObject(json, "file_paths", file_paths_array);
+
+    // Print the JSON object
+    char *json_str = cJSON_PrintUnformatted(json);
+    node_config *peer_config = json_to_node_config(json_str);
+    if(peer_config == NULL) {
+        printf("peer_config is NULL \n");
+        fflush(stdout);
+        return -1;
+    }
+
+    // Free memory
+    cJSON_Delete(json);
+    free(json_str);
+
+    return peer_config;
+
+}
+
+node_config* json_to_node_config(char* json_str) {
     cJSON* root = cJSON_Parse(json_str);
     if (!root) {
         printf("Failed to parse JSON: %s\n", cJSON_GetErrorPtr());
@@ -476,9 +498,9 @@ node_config* json_to_node_config(char* json_str) {
                 if (peer_uuid && peer_uuid->valuestring) {
                     strcpy(config->peers[i].uuid, peer_uuid->valuestring);
                 }
-                if (true) { // just do: add last_seen time
-                    strcpy(config->peers[i].last_seen, last_seen_str);
-                }
+                // if (true) { // just do: add last_seen time
+                //     strcpy(config->peers[i].last_seen, last_seen_str);
+                // }
                 if (peer_name && peer_name->valuestring) {
                     strcpy(config->peers[i].name, peer_name->valuestring);
                 }
@@ -596,11 +618,18 @@ int find_peer_weight(node_config *config, char *uuid) {
 }
 
 void update_peer_weights_last_seen(node_config *config, hash_table *ht, char *peer_uuid) {
+    // since we have the peer record, update the last_seen field
+    // Get current time as time_t
+    time_t current_time = time(NULL);
+    // Convert time_t to string
+    char last_seen_str[20];
+    strftime(last_seen_str, sizeof(last_seen_str), "%Y-%m-%d %H:%M:%S", localtime(&current_time));
     // Find the weight of the peer with the given uuid in the config
     int given_weight = 0;
     for (int i = 0; i < config->peer_count; i++) {
         if (strcmp(config->peers[i].uuid, peer_uuid) == 0) {
             given_weight = config->peers[i].weight;
+            strcpy(config->peers[i].last_seen, last_seen_str);
             break;
         }
     }
@@ -627,7 +656,7 @@ void update_peer_weights_last_seen(node_config *config, hash_table *ht, char *pe
                 }
                 peer_info *new_peer = &config->peers[config->peer_count++];
                 strcpy(new_peer->uuid, peer->uuid);
-                strcpy(new_peer->last_seen, "");
+                // strcpy(new_peer->last_seen, peer->last_seen);
                 strcpy(new_peer->name, peer->name);
                 strcpy(new_peer->host, peer->host);
                 new_peer->frontend_port = peer->frontend_port;
@@ -640,7 +669,7 @@ void update_peer_weights_last_seen(node_config *config, hash_table *ht, char *pe
                 if (new_weight < config->peers[index].weight) {
                     config->peers[index].weight = new_weight;
                 }
-                strcpy(config->peers[index].last_seen, peer->last_seen);
+                // strcpy(config->peers[index].last_seen, peer->last_seen);
             }
 
             node = node->next;

@@ -282,7 +282,23 @@ int main(int argc, char *argv[])
         int num_connections_to_pass = num_connections;
         connections[num_connections++] = tcp_connection_fd;
 
-        printf("tcp connection accepted on fd: %d", tcp_connection_fd);
+        printf("tcp connection accepted on fd: %d\n", tcp_connection_fd);
+        // get incoming connection's IP address
+        if (their_addr.ss_family == AF_INET) { // IPv4
+            struct sockaddr_in *ipv4 = (struct sockaddr_in *)&their_addr;
+            char ip_address[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, &(ipv4->sin_addr), ip_address, INET_ADDRSTRLEN);
+            printf("Client IP address: %s\n", ip_address);
+        } else if (their_addr.ss_family == AF_INET6) { // IPv6
+            struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)&their_addr;
+            char ip_address[INET6_ADDRSTRLEN];
+            inet_ntop(AF_INET6, &(ipv6->sin6_addr), ip_address, INET6_ADDRSTRLEN);
+            printf("Client IP address: %s\n", ip_address);
+        }
+        
+
+
+        // printf("Server: got connection from %s \n", s);
         printf("thread_index: %d\n", thread_index);
         fflush(stdout);
 
@@ -428,9 +444,6 @@ void child_routine(int connect_fd)
             printf("link-state advertisement received\n");
             // printf("buffer: %s \n", buffer);
             fflush(stdout);
-            send_str(connect_fd, node_config_to_json(&global_config, false));
-            // send_http_200(connect_fd);
-            // close(connect_fd);
 
             printf("%d Body: %s\n", pthread_self(), body);
             fflush(stdout);
@@ -442,6 +455,37 @@ void child_routine(int connect_fd)
                 fflush(stdout);
                 return;
             }
+            
+            // set client last_seen to current time
+            time_t current_time = time(NULL);
+            char last_seen_str[20];
+            strftime(last_seen_str, sizeof(last_seen_str), "%Y-%m-%d %H:%M:%S", localtime(&current_time));
+            strcpy(peer_config->last_seen, last_seen_str);
+
+            // set client host to client ip
+            // retrieve peer address
+            struct sockaddr_storage addr;
+            socklen_t addr_len = sizeof(addr);
+            if (getpeername(connect_fd, (struct sockaddr *)&addr, &addr_len) == -1) {
+                perror("getpeername");
+                exit(1);
+            }
+
+            // print peer address
+            char ip_str[INET6_ADDRSTRLEN];
+            void *addr_ptr;
+            if (addr.ss_family == AF_INET) { // IPv4 address
+                addr_ptr = &((struct sockaddr_in *)&addr)->sin_addr;
+            } else { // IPv6 address
+                addr_ptr = &((struct sockaddr_in6 *)&addr)->sin6_addr;
+            }
+            inet_ntop(addr.ss_family, addr_ptr, ip_str, sizeof(ip_str));
+            printf("Connected to peer with IP address: %s\n", ip_str);
+            // strcpy(peer_config->host, "::1");
+            strcpy(peer_config->host, ip_str);
+            send_str(connect_fd, node_config_to_json(&global_config, false));
+            // close(connect_fd);
+
             // update peer to network map ----------------------------------------------------
             update_network_map(network_map, peer_config);
             // hash_table_update_node_config(network_map, peer_config->uuid, peer_config);
@@ -461,17 +505,18 @@ void child_routine(int connect_fd)
             // fflush(stdout);
 
             // lookup peer's weight from myself and construct new network map
-            int client_weight = find_peer_weight(&global_config, peer_config->uuid);
+            // int client_weight = find_peer_weight(&global_config, peer_config->uuid);
 
             // printf("client_weight: %d \n", client_weight);
             fflush(stdout);
 
             // update global_config to include peer's neighbors as mine
             update_peer_weights_last_seen(&global_config, ht, peer_config->uuid);
+            // TODO: better to separate ^this part into another function
 
             char *global_config_str = node_config_to_json(&global_config, true);
 
-            // printf("global_config_str: %s \n", global_config_str);
+            printf("global_config_str: %s \n", global_config_str);
             fflush(stdout);
 
             hash_table_destroy(ht);

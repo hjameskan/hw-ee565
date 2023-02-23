@@ -577,6 +577,11 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
 
         int err = add_peer_from_string(&global_config, peer_string);
         if (err == -1) {send_str(connect_fd, "Error: add_peer_from_string error"); return;}
+        if (err == -2) {send_str(connect_fd, "Error: Peer with UUID already exists"); return;}
+
+        node_config* peer_config = url_path_to_config(peer_string);
+        if (peer_config == NULL) {send_str(connect_fd, "Error: url_path_to_config error"); return;}
+        update_network_map(network_map, peer_config);
 
         send_json_str(connect_fd, get_config_value_by_key_json(&global_config, "peers", false));
         return;

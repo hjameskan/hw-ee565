@@ -72,7 +72,7 @@ void* hash_table_get(hash_table *ht, void *key) {
     unsigned int hash = hash_func(key, ht->size);
     hash_node *node = ht->buckets[hash];
     while (node != NULL) {
-        if (node->key == key || memcmp(node->key, key, sizeof(key)) == 0 || strcmp((char*)node->key, key) == 0) {
+        if (node->key == key || memcmp(node->key, key, sizeof(key)) == 0) {
             return node->value;
         }
         node = node->next;

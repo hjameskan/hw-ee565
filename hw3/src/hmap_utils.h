@@ -30,7 +30,7 @@ void hash_table_put(hash_table *ht, void *key, void *value, int size);
 void* hash_table_get(hash_table *ht, void *key, int size);
 
 // Deletes the node with the given key from the hash table
-void hash_table_delete(hash_table *ht, void *key);
+void hash_table_delete(hash_table *ht, void *key, int size);
 
 // Deallocates the hash table and all of its nodes
 void hash_table_destroy(hash_table *ht);

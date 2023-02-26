@@ -702,7 +702,7 @@ void update_network_map(hash_table *ht, node_config* config) {
 
     if (old_config != NULL) {
         // If it exists, remove the old entry and replace it with the new config
-        hash_table_delete(ht, config->uuid);
+        hash_table_delete(ht, config->uuid, strlen(config->uuid));
         fflush(stdout);
     }
 
@@ -715,7 +715,7 @@ void hash_table_update_node_config(hash_table *ht, char *key, node_config *value
         size = sizeof(key);
     }
     // Remove old node_config entry
-    hash_table_delete(ht, key);
+    hash_table_delete(ht, key, size);
     // Add new node_config entry
     hash_table_put(ht, key, value, size);
 }

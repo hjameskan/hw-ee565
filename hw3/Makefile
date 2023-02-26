@@ -1,5 +1,5 @@
 ifndef default_conf
-default_conf = ./node_confs/node0.conf
+default_conf = ./node_confs/node.conf
 endif
 
 

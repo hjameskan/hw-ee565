@@ -55,7 +55,6 @@ void hash_table_put(hash_table *ht, void *key, void *value, int size) {
     unsigned int hash = hash_func(key, ht->size);
     hash_node *node = ht->buckets[hash];
     while (node != NULL) {
-        printf("node->key: %s key: %s sizeof(key): %d \n", node->key, key, sizeof(key));
         if (node->key == key || memcmp(node->key, key, size) == 0) {
             // Key already exists, update value
             node->value = value;

@@ -540,7 +540,6 @@ hash_table* node_config_to_hashmap(node_config *config, int root_weight) {
     initial_peer->weight = root_weight == NULL ? 0 : root_weight;
 
     hash_table_put(ht, initial_peer->uuid, initial_peer, strlen(initial_peer->uuid));
-    printf("Added initial peer to hash table: %s \n", initial_peer->uuid);
 
     // Add each peer to the hash table
     for (int i = 0; i < config->peer_count; i++) {
@@ -548,7 +547,6 @@ hash_table* node_config_to_hashmap(node_config *config, int root_weight) {
 
         // Check if the peer is already in the hash table
         peer_info *existing_peer = hash_table_get(ht, peer.uuid, strlen(peer.uuid));
-        printf("existing peer: %s \n", existing_peer ? existing_peer->uuid : "NULL");
 
         // If the peer is not in the hash table, create a new peer_info object for it
         if (existing_peer == NULL) {

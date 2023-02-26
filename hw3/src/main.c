@@ -658,7 +658,6 @@ void* check_peer_status(void* arg) {
     while (true) {
         // Send HTTP request to each peer
         for (int i = 0; i < config->peer_count; i++) {
-            printf("Checking peer %s status %s\n", config->peers[i].uuid, config->uuid);
             if(strcmp(config->peers[i].uuid, config->uuid) == 0) {
                 printf("Skipping self \n");
                 continue;

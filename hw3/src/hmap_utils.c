@@ -48,11 +48,15 @@ hash_table* hash_table_create(int size) {
 }
 
 // Inserts a key-value pair into the hash table
-void hash_table_put(hash_table *ht, void *key, void *value) {
+void hash_table_put(hash_table *ht, void *key, void *value, int size) {
+    if(size == NULL){
+        size = sizeof(key);
+    }
     unsigned int hash = hash_func(key, ht->size);
     hash_node *node = ht->buckets[hash];
     while (node != NULL) {
-        if (node->key == key || memcmp(node->key, key, sizeof(key)) == 0) {
+        printf("node->key: %s key: %s sizeof(key): %d \n", node->key, key, sizeof(key));
+        if (node->key == key || memcmp(node->key, key, size) == 0) {
             // Key already exists, update value
             node->value = value;
             return;
@@ -68,11 +72,14 @@ void hash_table_put(hash_table *ht, void *key, void *value) {
 }
 
 // Gets the value associated with the given key
-void* hash_table_get(hash_table *ht, void *key) {
+void* hash_table_get(hash_table *ht, void *key, int size) {
+    if(size == NULL){
+        size = sizeof(key);
+    }
     unsigned int hash = hash_func(key, ht->size);
     hash_node *node = ht->buckets[hash];
     while (node != NULL) {
-        if (node->key == key || memcmp(node->key, key, sizeof(key)) == 0) {
+        if (node->key == key || memcmp(node->key, key, size) == 0) {
             return node->value;
         }
         node = node->next;

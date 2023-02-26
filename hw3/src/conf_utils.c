@@ -539,14 +539,16 @@ hash_table* node_config_to_hashmap(node_config *config, int root_weight) {
     memcpy(initial_peer, config, sizeof(peer_info));
     initial_peer->weight = root_weight == NULL ? 0 : root_weight;
 
-    hash_table_put(ht, initial_peer->uuid, initial_peer);
+    hash_table_put(ht, initial_peer->uuid, initial_peer, strlen(initial_peer->uuid));
+    printf("Added initial peer to hash table: %s \n", initial_peer->uuid);
 
     // Add each peer to the hash table
     for (int i = 0; i < config->peer_count; i++) {
         peer_info peer = config->peers[i];
 
         // Check if the peer is already in the hash table
-        peer_info *existing_peer = hash_table_get(ht, peer.uuid);
+        peer_info *existing_peer = hash_table_get(ht, peer.uuid, strlen(peer.uuid));
+        printf("existing peer: %s \n", existing_peer ? existing_peer->uuid : "NULL");
 
         // If the peer is not in the hash table, create a new peer_info object for it
         if (existing_peer == NULL) {
@@ -556,7 +558,7 @@ hash_table* node_config_to_hashmap(node_config *config, int root_weight) {
                 return NULL;
             }
             memcpy(new_peer, &peer, sizeof(peer_info));
-            hash_table_put(ht, new_peer->uuid, new_peer);
+            hash_table_put(ht, new_peer->uuid, new_peer, strlen(new_peer->uuid));
         } else {
             // If the peer is already in the hash table, update its weight if the provided weight is higher
             if (strcmp(existing_peer->uuid, config->uuid) != 0 && peer.weight < existing_peer->weight) {
@@ -617,7 +619,7 @@ int find_peer_weight(node_config *config, char *uuid) {
     return -1; // Return -1 if the peer with the given UUID is not found
 }
 
-void update_peer_weights_last_seen(node_config *config, hash_table *ht, char *peer_uuid) {
+void update_peer_weights_last_seen(node_config *config, hash_table *ht, node_config *peer_config) {
     // since we have the peer record, update the last_seen field
     // Get current time as time_t
     time_t current_time = time(NULL);
@@ -625,6 +627,7 @@ void update_peer_weights_last_seen(node_config *config, hash_table *ht, char *pe
     char last_seen_str[20];
     strftime(last_seen_str, sizeof(last_seen_str), "%Y-%m-%d %H:%M:%S", localtime(&current_time));
     // Find the weight of the peer with the given uuid in the config
+    char *peer_uuid = peer_config->uuid;
     int given_weight = 0;
     for (int i = 0; i < config->peer_count; i++) {
         if (strcmp(config->peers[i].uuid, peer_uuid) == 0) {
@@ -633,12 +636,22 @@ void update_peer_weights_last_seen(node_config *config, hash_table *ht, char *pe
             break;
         }
     }
+    char lookup_uuid[128];
+    strcpy(lookup_uuid, config->uuid);
+    peer_info *peers_config_of_me;
+    if(given_weight == 0 && (peers_config_of_me= hash_table_get(ht, lookup_uuid, strlen(lookup_uuid))) != NULL) {
+        given_weight = peers_config_of_me->weight;
+    }
 
     // Update the weights of the peers in the config based on the hash table
     for (int i = 0; i < ht->size; i++) {
         hash_node *node = ht->buckets[i];
         while (node != NULL) {
             peer_info *peer = (peer_info *) node->value;
+            if(strcmp(peer->uuid, config->uuid) == 0) {
+                node = node->next;
+                continue;
+            }
 
             // Check if the peer is already in the config
             int index = -1;
@@ -687,7 +700,7 @@ node_config_list* add_node_config(node_config_list *list, node_config config) {
 
 void update_network_map(hash_table *ht, node_config* config) {
     // Check if the node's uuid is in the network map
-    void* old_config = hash_table_get(ht, config->uuid);
+    void* old_config = hash_table_get(ht, config->uuid, strlen(config->uuid));
 
     if (old_config != NULL) {
         // If it exists, remove the old entry and replace it with the new config
@@ -696,14 +709,17 @@ void update_network_map(hash_table *ht, node_config* config) {
     }
 
     // Add the new config to the network map
-    hash_table_put(ht, config->uuid, config);
+    hash_table_put(ht, config->uuid, config, strlen(config->uuid));
 }
 
-void hash_table_update_node_config(hash_table *ht, char *key, node_config *value) {
+void hash_table_update_node_config(hash_table *ht, char *key, node_config *value, int size) {
+    if(size == NULL){
+        size = sizeof(key);
+    }
     // Remove old node_config entry
     hash_table_delete(ht, key);
     // Add new node_config entry
-    hash_table_put(ht, key, value);
+    hash_table_put(ht, key, value, size);
 }
 
 

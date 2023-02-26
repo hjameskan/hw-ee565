@@ -24,10 +24,10 @@ unsigned int hash_func(void *key, int size);
 hash_table* hash_table_create(int size);
 
 // Inserts a key-value pair into the hash table
-void hash_table_put(hash_table *ht, void *key, void *value);
+void hash_table_put(hash_table *ht, void *key, void *value, int size);
 
 // Gets the value associated with the given key
-void* hash_table_get(hash_table *ht, void *key);
+void* hash_table_get(hash_table *ht, void *key, int size);
 
 // Deletes the node with the given key from the hash table
 void hash_table_delete(hash_table *ht, void *key);

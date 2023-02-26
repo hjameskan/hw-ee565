@@ -76,7 +76,7 @@ char* hashmap_to_json(hash_table *ht);
 
 int find_peer_weight(node_config *config, char *uuid);
 
-void update_peer_weights_last_seen(node_config *config, hash_table *ht, char *peer_uuid);
+void update_peer_weights_last_seen(node_config *config, hash_table *ht, node_config *peer_config);
 
 // Function to add a node_config struct to a node_config_list
 node_config_list* add_node_config(node_config_list *list, node_config config);
@@ -85,7 +85,7 @@ void update_network_map(hash_table *network_map, node_config* config);
 
 char* network_map_json(hash_table* network_map);
 
-void hash_table_update_node_config(hash_table *ht, char *key, node_config *value);
+void hash_table_update_node_config(hash_table *ht, char *key, node_config *value, int size);
 
 char* get_config_fields_json(char** config_strings, int config_strings_count, char** peer_strings, int peer_strings_count, node_config *config);
 

@@ -157,11 +157,11 @@ int main(int argc, char *argv[])
     float key2 = 3.14;
     int value2 = 42;
 
-    hash_table_put(ht, &key2, &value2);
+    hash_table_put(ht, &key2, &value2, NULL);
 
     // // Retrieve values from the hash table
-    // char *result1 = (char*) hash_table_get(ht, &key1);
-    int *result2 = (int*) hash_table_get(ht, &key2);
+    // char *result1 = (char*) hash_table_get(ht, &key1, NULL);
+    int *result2 = (int*) hash_table_get(ht, &key2, NULL);
     // printf("%s\n", result1); // "Hello, world!"
     printf("%d\n", *result2); // 42
 
@@ -462,7 +462,7 @@ void child_routine(int connect_fd)
             strftime(last_seen_str, sizeof(last_seen_str), "%Y-%m-%d %H:%M:%S", localtime(&current_time));
             strcpy(peer_config->last_seen, last_seen_str);
 
-            if(hash_table_get(network_map, peer_config->uuid) == NULL) {
+            if(hash_table_get(network_map, peer_config->uuid, strlen(peer_config->uuid)) == NULL) {
                 // record peer IP address if no record
                 struct sockaddr_storage addr;
                 socklen_t addr_len = sizeof(addr);
@@ -489,7 +489,7 @@ void child_routine(int connect_fd)
 
             // update peer to network map ----------------------------------------------------
             update_network_map(network_map, peer_config);
-            // hash_table_update_node_config(network_map, peer_config->uuid, peer_config);
+            // hash_table_update_node_config(network_map, peer_config->uuid, peer_config, strlen(peer_config->uuid)));
             
             // char* network_map_json_str = network_map_json(network_map);
             // printf("network_map\n%s\n", network_map_json_str);
@@ -500,19 +500,19 @@ void child_routine(int connect_fd)
             // get this peer's network map
             hash_table *ht = node_config_to_hashmap(peer_config, 0);
 
-            // char *json_str = hashmap_to_json(ht);
-            // // printf("\njson_str\n\n %s\n", json_str);
-            // free(json_str);
-            // fflush(stdout);
+            char *json_str = hashmap_to_json(ht);
+            printf("\njson_str\n\n %s\n", json_str);
+            free(json_str);
+            fflush(stdout);
 
             // lookup peer's weight from myself and construct new network map
             // int client_weight = find_peer_weight(&global_config, peer_config->uuid);
 
             // printf("client_weight: %d \n", client_weight);
-            fflush(stdout);
+            // fflush(stdout);
 
             // update global_config to include peer's neighbors as mine
-            update_peer_weights_last_seen(&global_config, ht, peer_config->uuid);
+            update_peer_weights_last_seen(&global_config, ht, peer_config);
             // TODO: better to separate ^this part into another function
 
             char *global_config_str = node_config_to_json(&global_config, true);
@@ -563,8 +563,8 @@ void child_routine(int connect_fd)
             // hash_table_put(ht_filepaths, filepath2, list2);
 
             // // Retrieve the node_config_list values for each filepath key
-            // node_config_list *list1_retrieved = (node_config_list*) hash_table_get(ht_filepaths, filepath1);
-            // node_config_list *list2_retrieved = (node_config_list*) hash_table_get(ht_filepaths, filepath2);
+            // node_config_list *list1_retrieved = (node_config_list*) hash_table_get(ht_filepaths, filepath1, strlen(filepath1));
+            // node_config_list *list2_retrieved = (node_config_list*) hash_table_get(ht_filepaths, filepath2, strlen(filepath2));
 
             // // Print the node_config structs in each list
             // printf("Node config list for filepath '%s':\n", filepath1);
@@ -658,6 +658,12 @@ void* check_peer_status(void* arg) {
     while (true) {
         // Send HTTP request to each peer
         for (int i = 0; i < config->peer_count; i++) {
+            printf("Checking peer %s status %s\n", config->peers[i].uuid, config->uuid);
+            if(strcmp(config->peers[i].uuid, config->uuid) == 0) {
+                printf("Skipping self \n");
+                continue;
+            }
+
             int sockfd;
             struct addrinfo hints, *servinfo, *p;
             int rv;

@@ -1,3 +1,8 @@
+ifndef default_conf
+default_conf = ./node_confs/node0.conf
+endif
+
+
 ifndef port1
 port1 = 8345
 endif
@@ -30,7 +35,7 @@ run-server: peerserver
 	./peerserver $(port3)
 
 run: vodserver
-	./vodserver $(port1) $(port2)
+	./vodserver $(port1) $(port2) $(default_conf)
 
 test:
 	(cd scripts; ./test_script.sh $(port1) | tee test.log)

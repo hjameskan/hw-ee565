@@ -105,6 +105,7 @@ int main(int argc, char *argv[])
 
     char *port = argv[1];
     char *udp_listen_port = argv[2];
+    char *conf_file_name = argv[3];
 
     int port_int = atoi(port);
     if (port_int < 0 || port_int > 65535)
@@ -115,8 +116,8 @@ int main(int argc, char *argv[])
 
     printf("Server started on port %s\n", port);
 
-    
-    
+
+
     // initialize global variables
     ht_filepaths = hash_table_create(MAX_HASHTABLE_SIZE);
     network_map = hash_table_create(MAX_HASHTABLE_SIZE);
@@ -144,7 +145,7 @@ int main(int argc, char *argv[])
     cJSON_Delete(json2);
     // ======================================================================================
 
-    read_config_file("node.conf", &global_config);
+    read_config_file(conf_file_name, &global_config);
 
     // Create a new hash table with 10 buckets
     hash_table *ht = hash_table_create(10);
@@ -295,7 +296,7 @@ int main(int argc, char *argv[])
             inet_ntop(AF_INET6, &(ipv6->sin6_addr), ip_address, INET6_ADDRSTRLEN);
             printf("Client IP address: %s\n", ip_address);
         }
-        
+
 
 
         // printf("Server: got connection from %s \n", s);
@@ -341,7 +342,7 @@ int main(int argc, char *argv[])
 
 //     // do link-state advertisement
 //     typedef struct
-//     {   
+//     {
 //         char *type; // link-state
 //         char *host;
 //         int *port;
@@ -352,7 +353,7 @@ int main(int argc, char *argv[])
 //         // void *neighors[]
 //     } link_state_advertisement;
 
-    
+
 
 //     // send link-state advertisement to all neighbors
 
@@ -404,7 +405,7 @@ void child_routine(int connect_fd)
 
     if (strlen(path_peer_copy) > 1 && strcmp(method, "GET") == 0)
     {
-        process_peer_path(path_peer_copy, connect_fd, buffer); 
+        process_peer_path(path_peer_copy, connect_fd, buffer);
     } else if(strcmp(method, "POST") == 0) {
         printf("POST request received\n");
         fflush(stdout);
@@ -447,7 +448,7 @@ void child_routine(int connect_fd)
 
             printf("%d Body: %s\n", pthread_self(), body);
             fflush(stdout);
-            
+
             // convert body to node_config
             node_config *peer_config = json_to_node_config(body);
             if(peer_config == NULL) {
@@ -455,7 +456,7 @@ void child_routine(int connect_fd)
                 fflush(stdout);
                 return;
             }
-            
+
             // set client last_seen to current time
             time_t current_time = time(NULL);
             char last_seen_str[20];
@@ -478,7 +479,7 @@ void child_routine(int connect_fd)
                     addr_ptr = &((struct sockaddr_in6 *)&addr)->sin6_addr;
                 }
                 inet_ntop(addr.ss_family, addr_ptr, ip_str, sizeof(ip_str));
-                
+
                 strcpy(peer_config->host, ip_str);
             } else {
                 // no need for action
@@ -490,7 +491,7 @@ void child_routine(int connect_fd)
             // update peer to network map ----------------------------------------------------
             update_network_map(network_map, peer_config);
             // hash_table_update_node_config(network_map, peer_config->uuid, peer_config, strlen(peer_config->uuid)));
-            
+
             // char* network_map_json_str = network_map_json(network_map);
             // printf("network_map\n%s\n", network_map_json_str);
             // update peer to network map ----------------------------------------------------
@@ -538,7 +539,7 @@ void child_routine(int connect_fd)
             //     .file_paths = NULL,
             //     .peers = NULL
             // };
-            
+
             // node_config config2 = {
             //     .uuid = "uuid2",
             //     .name = "node2",
@@ -590,7 +591,7 @@ void child_routine(int connect_fd)
 
 
             bzero(buffer, sizeof(buffer));
-            
+
             return;
         }
     } else {
@@ -653,7 +654,7 @@ void *udp_thread_routine(int *arg)
 
 void* check_peer_status(void* arg) {
     node_config* config = (node_config*)arg;
-    
+
 
     while (true) {
         // Send HTTP request to each peer
@@ -818,7 +819,7 @@ void udp_to_tcp_client(int *packet_count, struct timeval start_time, struct time
     struct sockaddr *server_addr;
     socklen_t addr_size;
     addr_size = sizeof(server_addr);
-    
+
     int n_bytes = recvfrom_timeout(sockfd, &file_packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, &addr_size, 1);
     if (n_bytes == 0)
     {
@@ -831,7 +832,7 @@ void udp_to_tcp_client(int *packet_count, struct timeval start_time, struct time
         return;
     }
     else
-    {   
+    {
         // // RATE LIMITING
         // // Get the current time
         // gettimeofday(&current_time, NULL);
@@ -902,8 +903,8 @@ void udp_to_tcp_client(int *packet_count, struct timeval start_time, struct time
         // printf("[+] Received packet %d of size %d bytes\n", file_packet.packet_number, file_packet.packet_data_size);
         // print_packet(&file_packet, "Received Packet from UDP Server\n");
         // fflush(stdout);
-        
-        
+
+
         // SEND FILE CHUNK TO TCP CLIENT
 
             int is_socket_avail = is_socket_in_array(client_sockfd);

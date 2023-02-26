@@ -601,6 +601,8 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
         // ********************************
         // PERFORM /PEER/MAP work here
         // ********************************
+        update_network_map(network_map, &global_config);
+
         char *config_fields[] ={"name", "weight", "peers" };
         char *peer_fields[] = {"name", "weight"};
         send_json_str(connect_fd, get_all_configs_json(config_fields, sizeof(config_fields)/sizeof(char *), peer_fields, sizeof(peer_fields)/sizeof(char *), network_map));

@@ -167,7 +167,7 @@ int main(int argc, char *argv[])
 
     // Delete a key-value pair from the hash table
     // hash_table_delete(ht, &key1);
-    hash_table_delete(ht, &key2);
+    hash_table_delete(ht, &key2, NULL);
 
     // Free memory allocated for the hash table and its nodes
     hash_table_destroy(ht);

@@ -88,12 +88,15 @@ void* hash_table_get(hash_table *ht, void *key, int size) {
 }
 
 // Deletes the node with the given key from the hash table
-void hash_table_delete(hash_table *ht, void *key) {
+void hash_table_delete(hash_table *ht, void *key, int size) {
+    if(size == NULL){
+        size = sizeof(key);
+    }
     unsigned int hash = hash_func(key, ht->size);
     hash_node *node = ht->buckets[hash];
     hash_node *prev = NULL;
     while (node != NULL) {
-        if (node->key == key || memcmp(node->key, key, sizeof(key)) == 0) {
+        if (node->key == key || memcmp(node->key, key, size) == 0) {
             if (prev == NULL) {
                 ht->buckets[hash] = node->next;
             } else {

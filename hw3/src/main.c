@@ -500,10 +500,10 @@ void child_routine(int connect_fd)
             // get this peer's network map
             hash_table *ht = node_config_to_hashmap(peer_config, 0);
 
-            char *json_str = hashmap_to_json(ht);
-            printf("\njson_str\n\n %s\n", json_str);
-            free(json_str);
-            fflush(stdout);
+            // char *json_str = hashmap_to_json(ht);
+            // printf("\njson_str\n\n %s\n", json_str);
+            // free(json_str);
+            // fflush(stdout);
 
             // lookup peer's weight from myself and construct new network map
             // int client_weight = find_peer_weight(&global_config, peer_config->uuid);

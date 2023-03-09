@@ -449,7 +449,7 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
             host_entry = gethostbyname(found_peer->host);
             if (host_entry == NULL)
             {
-                fprintf(stderr, "gethostbyname failed\n");
+                fprintf(stderr, "gethostbyname HOSTNAME: %s failed\n", found_peer->host);
                 fflush(stdout);
                 return;
             }

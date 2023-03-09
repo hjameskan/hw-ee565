@@ -1,0 +1,13 @@
+version: '3.9'
+services:
+  web:
+    image: my-ubuntu:latest
+    ports:
+      - "8345:8345"
+      - "8346:8346"
+      - "8347:8347"
+    container_name: hw4
+    command: ["./container-startup.sh"]
+    volumes:
+      - .:/hw4
+    working_dir: /hw4

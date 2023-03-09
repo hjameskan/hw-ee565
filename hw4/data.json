@@ -1,0 +1,5 @@
+{
+	"name":	"John Smith",
+	"age":	42,
+	"pets":	["cat", "dog", "fish"]
+}

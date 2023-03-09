@@ -1,0 +1,90 @@
+<html>
+  <head>
+    <style>
+      .container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 300px;
+      }
+      
+      .traffic-light {
+        position: relative;
+        width: 80px;
+        height: 200px;
+        opacity: .5;
+      }
+      
+      .bulb {
+        position: absolute;
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        animation: rotate 4s linear infinite, blink 3s ease-in-out infinite alternate;
+
+        /*transition: opacity 3s ease-out;*/
+      }
+      
+      .red {
+        top: 0;
+        background-color: #ff0000;
+      }
+      
+      .yellow {
+        top: 70px;
+        background-color: orange;
+      }
+      
+      .green {
+        top: 140px;
+        background-color: cyan;
+      }
+      
+      @keyframes rotate {
+        0% {
+          transform: translateY(0);
+        }
+        100% {
+          transform: translateY(140px);
+        }
+      }
+      
+      @keyframes blink {
+        0% {
+          opacity: 1;
+        }
+        100% {
+          opacity: 0.5;
+        }
+      }
+      
+      h1 {
+        text-align: center;
+        opacity: 0;
+        transition: opacity 1s ease-in;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="traffic-light">
+        <div class="bulb red"></div>
+        <div class="bulb yellow"></div>
+        <div class="bulb green"></div>
+      </div>
+    </div>
+    <br />
+    <h1 style="text-align: center;" id="message">I Cannot Find File!</h1>
+    
+    <script>
+      setTimeout(function() {
+        const message = document.getElementById('message');
+        message.style.opacity = 1;
+        const bulbs = document.querySelectorAll('.bulb');
+        for (const bulb of bulbs) {
+          bulb.style.opacity = 0;
+        }
+      }, 4000);
+    </script>
+  </body>
+</html>

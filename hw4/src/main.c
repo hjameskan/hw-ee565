@@ -859,9 +859,9 @@ void multiplex_udp() {
 
             // char* filepath = input_packet->file_path;
             char filepath[256];
-            strcpy(filepath, "content/");
-            strcat(filepath, input_packet.file_path);
-            fflush(stdout);
+            // strcpy(filepath, "content/");
+            // strcat(filepath, input_packet.file_path);
+            // fflush(stdout);
 
             FILE *requested_file = fopen(filepath, "rb");
             if(requested_file == NULL){

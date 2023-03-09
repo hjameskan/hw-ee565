@@ -547,30 +547,35 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
             }
         }
 
-        // for(int i = 0; i < ht_filepaths->size; i++) {
-        //     if(ht_filepaths->buckets[i] != NULL) {
-        //         hash_node *node = ht_filepaths->buckets[i];
-        //         while(node != NULL) {
-        //             file_info *f = (file_info *) node->value;
-        //             printf("FILE PATH: %s \n", f->path);
-        //             fflush(stdout);
-        //             if(f->peers != NULL) {
-        //                 for(int j = 0; j < f->peers->size; j++) {
-        //                     if(f->peers->buckets[j] != NULL) {
-        //                         hash_node *node2 = f->peers->buckets[j];
-        //                         while(node2 != NULL) {
-        //                             char *uuid = (char *) node2->key;
-        //                             printf("UUID______: %s \n", uuid);
-        //                             fflush(stdout);
-        //                         node2 = node2->next;
-        //                         }
-        //                     }
-        //                 }
-        //             }
-        //             node = node->next;
-        //         }
-        //     }
-        // }
+        FILE *html_file = fopen("html/file_list.html", "w");
+
+        // Write the HTML header
+        fprintf(html_file, "<!DOCTYPE html>\n");
+        fprintf(html_file, "<html>\n");
+        fprintf(html_file, "<head>\n");
+        fprintf(html_file, "<title>File List</title>\n");
+        fprintf(html_file, "</head>\n");
+        fprintf(html_file, "<body>\n");
+        fprintf(html_file, "<h1>File List</h1>\n");
+
+        // Create the HTML list
+        fprintf(html_file, "<ul>\n");
+        // cJSON *file_list = cJSON_GetObjectItem(json, "file_list");
+        for (int i = 0; i < cJSON_GetArraySize(json); i++) {
+            printf("CJSON print: \n");
+            cJSON *item = cJSON_GetArrayItem(json, i);
+            cJSON *content = cJSON_GetObjectItem(item, "content");
+            printf("CJSON print: %s\n", content);
+            fprintf(html_file, "<li>%s</li>\n", cJSON_GetStringValue(content));
+        }
+        fprintf(html_file, "</ul>\n");
+
+        // Write the HTML footer
+        fprintf(html_file, "</body>\n");
+        fprintf(html_file, "</html>\n");
+
+        // Close the HTML file
+        fclose(html_file);
 
         char *json_string = cJSON_Print(json); // convert the JSON object to a string
         send_json_str(connect_fd, json_string);

@@ -426,18 +426,18 @@ void list_files(const char *path, hash_table *files) {
                 stack_push(dir_stack, (void *) fp1);
             } else {
                 if (strcmp(entry->d_name, ".DS_Store") == 0) continue;
-                // file_info f = {0};
-                file_info *f = malloc(sizeof(file_info));
-                f->peers = hash_table_create(MAX_HASHTABLE_SIZE);
                 char *fp2 = malloc(256);
                 sprintf(fp2, "%s/%s", current_path, entry->d_name);
-                fflush(stdout);
-                // char full_path_key[256];
-                sprintf(f->path, "%s", fp2);
-                // strcpy(f->path, fp2);
-                // hash_table_put(files, f->path, f, strlen(f->path));
-                if(hash_table_get(files, f->path, strlen(f->path)) == NULL) {
-                    hash_table_put_str(files, f->path, f, strlen(f->path));
+                if(hash_table_get(files, fp2, strlen(fp2)) == NULL) {
+                    file_info *f = malloc(sizeof(file_info));
+                    f->peers = hash_table_create(MAX_HASHTABLE_SIZE);
+                    bool isFound = hash_table_get(f->peers, global_config.uuid, strlen(global_config.uuid));
+                    if (!isFound) {
+                        hash_table_put(f->peers, global_config.uuid, true, strlen(global_config.uuid));
+                    }
+                    fflush(stdout);
+                    sprintf(f->path, "%s", fp2);
+                    hash_table_put_str(files, fp2, f, strlen(f->path));
                 }
                 free(fp2);
             }
@@ -486,8 +486,11 @@ void child_routine(int connect_fd)
 
     printf("path_peer_copy: %s \r\n", path_peer_copy);
     fflush(stdout);
-
-    if (strlen(path_peer_copy) > 1 && strcmp(method, "GET") == 0)
+    if(strcmp(path, "/") == 0) {
+        send_http_302(connect_fd);
+        return;
+    }
+    else if (strlen(path_peer_copy) > 1 && strcmp(method, "GET") == 0)
     {
         process_peer_path(path_peer_copy, connect_fd, buffer); 
     } else if(strcmp(method, "POST") == 0) {

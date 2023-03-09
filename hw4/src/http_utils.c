@@ -213,6 +213,23 @@ void transfer_standard_file(char *file_path, int socket_fd, char *content_type)
     }
 }
 
+void send_http_302(int connection_fd)
+{
+    char message[200];
+    char date_timestamp[100];
+
+    generate_timestamp(date_timestamp);
+    sprintf(message, "HTTP/1.1 302 Found\r\n"
+                     "Content-Type: text/html; charset=UTF-8\r\n"
+                     "Location: /peer/search/video\r\n"
+                     "Date: %s\r\n\r\n",
+            date_timestamp);
+
+    send(connection_fd, message, strlen(message), 0);
+
+    close(connection_fd);
+}
+
 void send_http_200(int connection_fd)
 {
     char message[200];

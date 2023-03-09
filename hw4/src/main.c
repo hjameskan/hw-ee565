@@ -1054,7 +1054,7 @@ void* check_peer_status(void* arg) {
         for (int i = 0; i < config->peer_count; i++) {
             if(strcmp(config->peers[i].uuid, config->uuid) == 0) {
                 printf("Skipping self \n");
-                continue;
+                // continue;
             }
 
             int sockfd;

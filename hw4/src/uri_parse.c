@@ -21,6 +21,7 @@ extern int udp_connection_fd;
 extern int global_rate_limit;
 extern node_config global_config;
 extern hash_table *network_map;
+extern hash_table *ht_filepaths;
 
 int peers_count = 0;
 
@@ -503,6 +504,80 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
 
         printf("file chunk request sent to peer\n");
         fflush(stdout);
+
+        return;
+    }else if (strcmp(peer_cmd, "search") == 0)
+    {
+        printf("/peer/search parsed!\n");
+        char *search_query;
+
+        char *content_path = strtok_r(NULL, "", &rest); // here is the content path
+
+        // ********************************
+        // PERFORM /PEER/SEARCH work here
+        // ********************************
+
+        cJSON *json = cJSON_CreateArray(); // create the JSON array
+
+        for(int i = 0; i < ht_filepaths->size; i++) {
+            if(ht_filepaths->buckets[i] != NULL) {
+                hash_node *node = ht_filepaths->buckets[i];
+                while(node != NULL) {
+                    file_info *f = (file_info *) node->value;
+                    if(strstr(f->path, content_path) != NULL) { // check if the content_path string is a substring of the file path
+                        cJSON *file_object = cJSON_CreateObject(); // create a new JSON object for the file
+                        cJSON_AddStringToObject(file_object, "content", f->path); // add the file path to the object as "content"
+                        cJSON *peers_array = cJSON_AddArrayToObject(file_object, "peers"); // add an empty array to the object as "peers"
+                        if(f->peers != NULL) {
+                            for(int j = 0; j < f->peers->size; j++) {
+                                if(f->peers->buckets[j] != NULL) {
+                                    hash_node *node2 = f->peers->buckets[j];
+                                    while(node2 != NULL) {
+                                        char *uuid = (char *) node2->key;
+                                        cJSON_AddItemToArray(peers_array, cJSON_CreateString(uuid)); // add each peer UUID to the array
+                                        node2 = node2->next;
+                                    }
+                                }
+                            }
+                        }
+                        cJSON_AddItemToArray(json, file_object); // add the file object to the main array
+                    }
+                    node = node->next;
+                }
+            }
+        }
+
+        // for(int i = 0; i < ht_filepaths->size; i++) {
+        //     if(ht_filepaths->buckets[i] != NULL) {
+        //         hash_node *node = ht_filepaths->buckets[i];
+        //         while(node != NULL) {
+        //             file_info *f = (file_info *) node->value;
+        //             printf("FILE PATH: %s \n", f->path);
+        //             fflush(stdout);
+        //             if(f->peers != NULL) {
+        //                 for(int j = 0; j < f->peers->size; j++) {
+        //                     if(f->peers->buckets[j] != NULL) {
+        //                         hash_node *node2 = f->peers->buckets[j];
+        //                         while(node2 != NULL) {
+        //                             char *uuid = (char *) node2->key;
+        //                             printf("UUID______: %s \n", uuid);
+        //                             fflush(stdout);
+        //                         node2 = node2->next;
+        //                         }
+        //                     }
+        //                 }
+        //             }
+        //             node = node->next;
+        //         }
+        //     }
+        // }
+
+        char *json_string = cJSON_Print(json); // convert the JSON object to a string
+        send_json_str(connect_fd, json_string);
+        printf("%s\n", json_string); // print the JSON string
+
+        free(json_string); // free the memory used by the JSON string
+        cJSON_Delete(json); // delete the JSON object
 
         return;
     }

@@ -748,6 +748,12 @@ void *udp_thread_routine(int *arg)
     addr.sin_family = AF_INET;
     addr.sin_port = htons(udp_listen_port);
     addr.sin_addr.s_addr = INADDR_ANY;
+    
+    int n = bind(sockfd, (struct sockaddr*)&addr, sizeof(addr));
+    if (n < 0) {
+        perror("[-]bind error");
+        exit(1);
+    }
 
     udp_connection_fd = sockfd; // set global udp_connection_fd
 
@@ -796,6 +802,8 @@ void multiplex_udp() {
     if (n_bytes == 0)
     {
         printf("[-] n_bytes == 0\n");
+        printf("[-] udp_connection_fd: %d\n", udp_connection_fd);
+        fflush(stdout);
         return;
     }
     else if (n_bytes == -1)
@@ -1043,7 +1051,7 @@ void* check_peer_status(void* arg) {
         for (int i = 0; i < config->peer_count; i++) {
             if(strcmp(config->peers[i].uuid, config->uuid) == 0) {
                 printf("Skipping self \n");
-                // continue;
+                continue;
             }
 
             int sockfd;
@@ -1063,7 +1071,7 @@ void* check_peer_status(void* arg) {
                 continue;
             }
 
-            printf("got addr info %d\n", rv);
+            // printf("got addr info %d\n", rv);
 
             // loop through all the results and connect to the first we can
             for (p = servinfo; p != NULL; p = p->ai_next) {
@@ -1087,7 +1095,7 @@ void* check_peer_status(void* arg) {
             }
 
             inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), s, sizeof s);
-            printf("client: connecting to %s\n", s);
+            // printf("client: connecting to %s\n", s);
             fflush(stdout);
 
             freeaddrinfo(servinfo); // all done with this structure

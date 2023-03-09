@@ -369,11 +369,7 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
             send_html_from_file(connect_fd, "html/not_found.html");
             return;
         } else { printf("FOUND!!!\n"); }
-        printf("here-4\n");
-        fflush(stdout);
         printf("found peer: %s %d %d %s\n", found_peer->host, found_peer->frontend_port, found_peer->backend_port, found_peer->uuid);
-        printf("here-3\n");
-        fflush(stdout);
 
         // struct peer_url *peer = NULL;
         // for (int i = 0; i < peers_count; i++)
@@ -406,12 +402,43 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
             hashmap_print_all(sockets_map);
         }
 
+        /*
+        struct sockaddr_in6 addr;
+        memset(&addr, '\0', sizeof(addr));
+        addr.sin6_family = AF_INET6;
+        addr.sin6_port = htons(found_peer->backend_port);
+        if (inet_pton(AF_INET6, found_peer->host, &addr.sin6_addr) == 1)
+        {
+            // host is an IPv6 address, use it directly
+        }
+        else
+        {
+            struct addrinfo hints, *result;
+            memset(&hints, 0, sizeof(struct addrinfo));
+            hints.ai_family = AF_INET6;
+            hints.ai_socktype = SOCK_STREAM;
+            hints.ai_flags = AI_V4MAPPED | AI_ALL;
+            int error = getaddrinfo(found_peer->host, NULL, &hints, &result);
+            if (error != 0)
+            {
+                fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(error));
+                return;
+            }
+            memcpy(&addr.sin6_addr, &((struct sockaddr_in6 *)result->ai_addr)->sin6_addr, sizeof(struct in6_addr));
+            freeaddrinfo(result);
+        }
+        */
         struct sockaddr_in addr;
         memset(&addr, '\0', sizeof(addr));
         addr.sin_family = AF_INET;
         addr.sin_port = htons(found_peer->backend_port);
         // addr.sin_port = htons(atoi(peer->port));
-        if (inet_pton(AF_INET, found_peer, &addr.sin_addr) == 1)
+        if(strcmp(found_peer->host, "::1") == 0 ){
+            strcpy(found_peer->host, "localhost");
+            printf("changed to localhost\n");
+            fflush(stdout);
+        }
+        if (inet_pton(AF_INET, found_peer->host, &addr.sin_addr) == 1)
         {
             // host is an IP address, use it directly
         }
@@ -422,6 +449,7 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
             if (host_entry == NULL)
             {
                 fprintf(stderr, "gethostbyname failed\n");
+                fflush(stdout);
                 return;
             }
 

@@ -530,8 +530,8 @@ void child_routine(int connect_fd)
             // printf("buffer: %s \n", buffer);
             fflush(stdout);
 
-            printf("%d Body: %s\n", pthread_self(), body);
-            fflush(stdout);
+            // printf("%d Body: %s\n", pthread_self(), body);
+            // fflush(stdout);
             
             // convert body to node_config
             node_config *peer_config = json_to_node_config(body);
@@ -546,30 +546,30 @@ void child_routine(int connect_fd)
             update_peer_to_files_map(ht_filepaths, peers_files_map, peer_config);
             
             // print updated files map and associated peers
-            for(int i = 0; i < ht_filepaths->size; i++) {
-                if(ht_filepaths->buckets[i] != NULL) {
-                    hash_node *node = ht_filepaths->buckets[i];
-                    while(node != NULL) {
-                        file_info *f = (file_info *) node->value;
-                        printf("FILE PATH: %s \n", f->path);
-                        fflush(stdout);
-                        if(f->peers != NULL) {
-                            for(int j = 0; j < f->peers->size; j++) {
-                                if(f->peers->buckets[j] != NULL) {
-                                    hash_node *node2 = f->peers->buckets[j];
-                                    while(node2 != NULL) {
-                                        char *uuid = (char *) node2->key;
-                                        printf("UUID______: %s \n", uuid);
-                                        fflush(stdout);
-                                    node2 = node2->next;
-                                    }
-                                }
-                            }
-                        }
-                        node = node->next;
-                    }
-                }
-            }
+            // for(int i = 0; i < ht_filepaths->size; i++) {
+            //     if(ht_filepaths->buckets[i] != NULL) {
+            //         hash_node *node = ht_filepaths->buckets[i];
+            //         while(node != NULL) {
+            //             file_info *f = (file_info *) node->value;
+            //             printf("FILE PATH: %s \n", f->path);
+            //             fflush(stdout);
+            //             if(f->peers != NULL) {
+            //                 for(int j = 0; j < f->peers->size; j++) {
+            //                     if(f->peers->buckets[j] != NULL) {
+            //                         hash_node *node2 = f->peers->buckets[j];
+            //                         while(node2 != NULL) {
+            //                             char *uuid = (char *) node2->key;
+            //                             printf("UUID______: %s \n", uuid);
+            //                             fflush(stdout);
+            //                         node2 = node2->next;
+            //                         }
+            //                     }
+            //                 }
+            //             }
+            //             node = node->next;
+            //         }
+            //     }
+            // }
             // set client last_seen to current time
             time_t current_time = time(NULL);
             char last_seen_str[20];
@@ -634,7 +634,7 @@ void child_routine(int connect_fd)
             char *global_config_str = node_config_to_json(&global_config, true, ht_filepaths);
             // char *global_config_str = node_config_to_json(&global_config, true, NULL);
 
-            printf("global_config_str: %s \n", global_config_str);
+            // printf("global_config_str: %s \n", global_config_str);
             fflush(stdout);
 
             hash_table_destroy(ht);
@@ -748,7 +748,7 @@ void *udp_thread_routine(int *arg)
     addr.sin_family = AF_INET;
     addr.sin_port = htons(udp_listen_port);
     addr.sin_addr.s_addr = INADDR_ANY;
-    
+
     int n = bind(sockfd, (struct sockaddr*)&addr, sizeof(addr));
     if (n < 0) {
         perror("[-]bind error");
@@ -867,7 +867,7 @@ void multiplex_udp() {
             if(requested_file == NULL){
                 strcpy(buffer, "File not found\n");
                 sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&server_addr, addr_size);
-                printf("[-]File not found\n");
+                printf("[-]File not found: %s\n", filepath);
                 fflush(stdout);
                 return;
             }

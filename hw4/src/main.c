@@ -758,7 +758,7 @@ void *udp_thread_routine(int *arg)
     udp_connection_fd = sockfd; // set global udp_connection_fd
 
     while (1) {
-        printf("Waiting for UDP packet...\n");
+        // printf("Waiting for UDP packet...\n");
         fflush(stdout);
         multiplex_udp();
     }
@@ -793,7 +793,7 @@ void multiplex_udp() {
         .content_length = 0,
         .packet_data = ""
     };
-    struct sockaddr *server_addr;
+    struct sockaddr server_addr;
     socklen_t addr_size;
     addr_size = sizeof(server_addr);
     
@@ -801,8 +801,8 @@ void multiplex_udp() {
     int n_bytes = recvfrom_timeout(sockfd, &input_packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, &addr_size, 1);
     if (n_bytes == 0)
     {
-        printf("[-] n_bytes == 0\n");
-        printf("[-] udp_connection_fd: %d\n", udp_connection_fd);
+        // printf("[-] n_bytes == 0\n");
+        // printf("[-] udp_connection_fd: %d\n", udp_connection_fd);
         fflush(stdout);
         return;
     }
@@ -823,7 +823,7 @@ void multiplex_udp() {
         printf("packet_type: %s \n", input_packet.packet_type);
         printf("packet_type: %s \n", input_packet.packet_type);
         printf("packet_type: %s \n", input_packet.packet_type);
-        if(strncmp(input_packet.packet_type, "syn", strlen("syn")) == 0){
+        /*if(strncmp(input_packet.packet_type, "syn", strlen("syn")) == 0){
             char* filepath = input_packet.packet_data;
             
             // get file size from filepath
@@ -851,7 +851,7 @@ void multiplex_udp() {
             exit(1);
             }
         }
-        else if(strncmp(input_packet.packet_type, "ack", strlen("ack")) == 0){
+        else*/ if(strncmp(input_packet.packet_type, "ack", strlen("ack")) == 0){
             // send file here
             char buffer[1024];
             socklen_t addr_size;
@@ -920,6 +920,7 @@ void multiplex_udp() {
             int n_bytes = fread(output_packet.packet_data, 1, need_to_read_bytes, requested_file);
             output_packet.packet_number = input_packet.ack_number;
             output_packet.packet_data_size = n_bytes;
+            strcpy(output_packet.packet_type, "synack");
             if (n_bytes > 0) {
                 int size = sizeof(output_packet);
                 printf("[+]Sending packet %d of size %d\n", output_packet.packet_number, n_bytes);
@@ -1026,6 +1027,7 @@ void multiplex_udp() {
             ack_packet.ack_number += 1;
             ack_packet.packet_number += 1;
             ack_packet.start_byte += PACKET_DATA_SIZE;
+            strcpy(ack_packet.packet_type, "ack");
 
             int sent = sendto(sockfd, (char*) &ack_packet, sizeof(Packet), 0, (struct sockaddr*)&server_addr, addr_size);
             if (sent == -1) {

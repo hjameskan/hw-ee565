@@ -460,7 +460,7 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
         // request udp file chunk from the peer
         Packet ack_packet = {
             .connection_id = 'view_req_fd_filepath',
-            .packet_type = "ack",
+            .packet_type = "ack", // TODO: CHANGE TO SYN
             .ack_number = 0,
             .file_path = content_path,
             .start_byte = 0, // startbyte

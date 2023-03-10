@@ -155,8 +155,8 @@ int main(int argc, char *argv[])
 
     read_config_file("node.conf", &global_config);
 
-    // strcpy(global_config.host, "localhost");
-    // hash_table_put(network_map, global_config.uuid, &global_config, strlen(global_config.uuid));
+    strcpy(global_config.host, "localhost");
+    hash_table_put(network_map, global_config.uuid, &global_config, strlen(global_config.uuid));
 
     // Create a new hash table with 10 buckets
     hash_table *ht = hash_table_create(10);

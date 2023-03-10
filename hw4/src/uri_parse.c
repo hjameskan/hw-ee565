@@ -254,7 +254,7 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
 
     if (strcmp(first_token, "peer") != 0)
     {
-        printf("not peer req\n");
+        printf("not peer req %s\n", first_token);
         return;
     }
 

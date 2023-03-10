@@ -526,6 +526,7 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
                 hash_node *node = ht_filepaths->buckets[i];
                 while(node != NULL) {
                     file_info *f = (file_info *) node->value;
+                    printf("+++++++++++++++++++>>>>>>>>>>file path: %s\n", node->key);
                     if(strstr(f->path, content_path) != NULL) { // check if the content_path string is a substring of the file path
                         cJSON *file_object = cJSON_CreateObject(); // create a new JSON object for the file
                         printf("-=-=-=-=-=-=----((((*****************))))>file path: %s found\n", f->path); fflush(stdout);

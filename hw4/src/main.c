@@ -392,7 +392,6 @@ void folder_monitor(hash_table *files1) {
             perror("opendir error");
             exit(EXIT_FAILURE);
         }
-
         list_files(path, files1);
 
         // Print the hash table
@@ -440,7 +439,7 @@ void list_files(const char *path, hash_table *files) {
                     }
                     fflush(stdout);
                     sprintf(f->path, "%s", fp2);
-                    hash_table_put_str(files, fp2, f, strlen(f->path));
+                    hash_table_put_str(files, f->path, f, strlen(f->path));
                 }
                 free(fp2);
             }
@@ -536,8 +535,8 @@ void child_routine(int connect_fd)
             // printf("buffer: %s \n", buffer);
             fflush(stdout);
 
-            // printf("%d Body: %s\n", pthread_self(), body);
-            // fflush(stdout);
+            printf("%d Body: %s\n", pthread_self(), body);
+            fflush(stdout);
             
             // convert body to node_config
             node_config *peer_config = json_to_node_config(body);
@@ -605,10 +604,10 @@ void child_routine(int connect_fd)
             // } else {
                 // no need for action
             // }
+            printf("HERE*****************************\n"); fflush(stdout);
 
             send_str(connect_fd, node_config_to_json(&global_config, false, NULL));
             // close(connect_fd);
-
             // update peer to network map ----------------------------------------------------
             update_network_map(network_map, peer_config);
             hash_table_update_node_config(network_map, peer_config->uuid, peer_config, strlen(peer_config->uuid));
@@ -644,6 +643,7 @@ void child_routine(int connect_fd)
             fflush(stdout);
 
             hash_table_destroy(ht);
+            printf("HERE*****************************\n"); fflush(stdout);
 
             // HW4: ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
             // // Create some dummy node_config structs

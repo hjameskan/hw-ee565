@@ -562,7 +562,7 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
         fprintf(html_file, "<ul>\n");
         // cJSON *file_list = cJSON_GetObjectItem(json, "file_list");
         for (int i = 0; i < cJSON_GetArraySize(json); i++) {
-            printf("CJSON print: \n");
+            // printf("CJSON print: \n");
             cJSON *item = cJSON_GetArrayItem(json, i);
             cJSON *content = cJSON_GetObjectItem(item, "content");
             printf("CJSON print: %s\n", content);

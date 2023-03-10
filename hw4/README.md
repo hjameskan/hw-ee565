@@ -1,6 +1,6 @@
 # DESIGN DOCUMENT #
 
-[DOWNLOAD PDF FILE](design/design.pdf)
+[DOWNLOAD PDF FILE](design/design4.pdf)
 
 <br/>
 
@@ -22,7 +22,7 @@ You can see how to test the url requests [by clicking here](#http-server)
 <br /><br />
 
 # Code Architecture #
-![This is the architecture](design/Architecture2_2.png)
+![This is the architecture](design/Architecture2_3.png)
 <br/><br/>
 # TCP Peer Checker #
 
@@ -34,44 +34,7 @@ Upon receiving the network update, each server records the time of connection. T
 
 <a id="http-server"></a>
 # HTTP Server # 
-```
-/peer/uuid
-```
-This path displays the UUID set in the node.conf file. If the file doesn't exist, a default one is generated.
-![This is the uuid response](design/uuid.png)
-<br/><br/>
-```
-/peer/neighbors
-```
-This path displays all the peers of the current server specified in the node.conf file. This path updates when the /peer/addneighbor path is called.
-![This is the neighbors response](design/neighbors.png)
-<br/><br/>
 
-
-```
-/peer/addneighbor?uuid=e94fc272-5611-4a61-8b27-de7fe233797f&host=nu.ece.cmu.edu&frontend=18345&backend=18346&metric=30
-```
-This path allows the user to add a neighbor with the specified UUID, host, frontend port, backend port, and metric. This updates the network map for the requested server.
-<br/><br/>
-⚠️Make sure there are no spaces or “%20” in the url or there will be errors ⚠️
-![This is the addneighbor response](design/addneighbor.png)
-<br/><br/>
-
-
-```
-/peer/map
-```
-This path displays the entire network architecture with all metrics and all levels of hierarchy included.
-![This is the map response](design/map.png)
-<br/><br/>
-```
-/peer/rank/<content path>
-```
-This path displays all the peers of the server but shows only the calculated fastest path based on the metric of each peer.
-<br/>
-<br/>
-![This is the rank response](design/rank.png)
-<br/><br/>
 
 ```
 /peer/search/<search path>

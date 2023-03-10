@@ -604,7 +604,6 @@ void child_routine(int connect_fd)
             // } else {
                 // no need for action
             // }
-            printf("HERE*****************************\n"); fflush(stdout);
 
             send_str(connect_fd, node_config_to_json(&global_config, false, NULL));
             // close(connect_fd);
@@ -643,7 +642,6 @@ void child_routine(int connect_fd)
             fflush(stdout);
 
             hash_table_destroy(ht);
-            printf("HERE*****************************\n"); fflush(stdout);
 
             // HW4: ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
             // // Create some dummy node_config structs
@@ -1059,7 +1057,7 @@ void* check_peer_status(void* arg) {
         // Send HTTP request to each peer
         for (int i = 0; i < config->peer_count; i++) {
             if(strcmp(config->peers[i].uuid, config->uuid) == 0) {
-                printf("Skipping self \n");
+                printf("Skipping self \n"); fflush(stdout);
                 // continue;
             }
 
@@ -1111,7 +1109,7 @@ void* check_peer_status(void* arg) {
 
             char* json_data = node_config_to_json(config, true, ht_filepaths);
 
-            char request[2048];
+            char request[4096];
             sprintf(request, "POST /link-state HTTP/1.1\r\nHost: %s:%d\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", config->peers[i].host, config->peers[i].frontend_port, strlen(json_data), json_data);
 
             if (send(sockfd, request, strlen(request), 0) == -1) {

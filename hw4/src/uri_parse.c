@@ -518,14 +518,17 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
         // ********************************
 
         cJSON *json = cJSON_CreateArray(); // create the JSON array
-
+        printf("/peer/search PRINTING HASH TABLE KEYS %d\n", ht_filepaths->size);
+        print_keys(ht_filepaths);
+        fflush(stdout);
         for(int i = 0; i < ht_filepaths->size; i++) {
-            if(ht_filepaths->buckets[i] != NULL) {
+            // if(ht_filepaths->buckets[i] != NULL) {
                 hash_node *node = ht_filepaths->buckets[i];
                 while(node != NULL) {
                     file_info *f = (file_info *) node->value;
                     if(strstr(f->path, content_path) != NULL) { // check if the content_path string is a substring of the file path
                         cJSON *file_object = cJSON_CreateObject(); // create a new JSON object for the file
+                        printf("-=-=-=-=-=-=----((((*****************))))>file path: %s found\n", f->path); fflush(stdout);
                         cJSON_AddStringToObject(file_object, "content", f->path); // add the file path to the object as "content"
                         cJSON *peers_array = cJSON_AddArrayToObject(file_object, "peers"); // add an empty array to the object as "peers"
                         if(f->peers != NULL) {
@@ -544,7 +547,7 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
                     }
                     node = node->next;
                 }
-            }
+            // }
         }
 
         FILE *html_file = fopen("html/file_list.html", "w");

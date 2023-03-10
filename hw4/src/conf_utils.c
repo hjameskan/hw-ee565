@@ -616,24 +616,10 @@ void update_peer_to_files_map(hash_table *local_files_map, hash_table *peers_ht_
                 else {
                     printf("HERE------------------------\n"); fflush(stdout);
                     printf("this is file_path: %s \n", file_path);
-                    // fflush(stdout);
-                    // char uuid_copy[128] = {0};
-                    // char file_path_copy[128] = {0};
-                    // strcpy(uuid_copy, peer_config->uuid);
-                    // strcpy(file_path_copy, file_path);
-
-                    // file_info file_info_copy;
-                    // strcpy(file_info_copy.path, file_path);
-                    // file_info_copy.num_peers = 1;
-                    // file_info_copy.peers = hash_table_create(MAX_HASHTABLE_SIZE);
-                    // hash_table_put(file_info_copy.peers, uuid_copy, true, strlen(uuid_copy));
-                    // hash_table_put_str(local_files_map, file_path_copy, &file_info_copy, strlen(file_path_copy));
-                    // printf("this is file_path_copy: %s \n", file_path_copy);
-                    // printf("this is uuid_copy: %s \n", uuid_copy);
-                    // fflush(stdout);
                     printf("HERE------------------------\n"); fflush(stdout);
                     file_info *f = malloc(sizeof(file_info));
                     f->peers = hash_table_create(MAX_HASHTABLE_SIZE);
+                    strcpy(f->path, peers_file_info->path);
                     bool isFound = hash_table_get(f->peers, peer_config->uuid, strlen(peer_config->uuid));
                     if (!isFound) {
                         hash_table_put(f->peers, peer_config->uuid, true, strlen(peer_config->uuid));

@@ -517,6 +517,16 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
         printf("----------------------\n");
         printf("ack_packet before sent:\n");
         fflush(stdout);
+        
+        if(strcmp(global_config.uuid, found_peer->uuid) == 0){
+            printf("found peer is self\n");
+            fflush(stdout);
+            // send_html_from_file(connect_fd, content_path);
+            // return;
+            // sleep(100000000);
+
+        }
+
 
         int s = sendto(udp_connection_fd, (char *)&ack_packet, sizeof(Packet), 0, (struct sockaddr *)&addr, sizeof(addr));
         if (s < 0)
@@ -555,45 +565,14 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
                 hash_node *node = ht_filepaths->buckets[i];
                 while(node != NULL) {
                     file_info *f = (file_info *) node->value;
-                    printf("+++++++++++++++++++>>>>>>>>>>file path: %s\n", node->key);
                     char to_search[128] = {0};
-                    strcpy(to_search, f->path);
+                    strcpy(to_search, node->key);
                     char search_for[128] = {0};
                     strcpy(search_for, content_path);
 
-                    regex_t regex;
-                    int reti;
-                    char *pattern = search_for;
-                    // compile the regex pattern
-                    reti = regcomp(&regex, search_for, 0);
-                    if (reti) {
-                        fprintf(stderr, "Could not compile regex\n");
-                    }
-
-                    if(searchSubstring(&to_search, &search_for) != -1) {
-                        cJSON *file_object = cJSON_CreateObject(); // create a new JSON object for the file
-                        printf("-=-=-=-=-=-=----((((*****************))))>file path: %s found\n", f->path); fflush(stdout);
-                    }
-
-                    // execute the regex pattern on the file path
-                    // reti = regexec(&regex, to_search, 0, NULL, 0);
-                    // if (!reti) {
-                    //     // if the regex pattern matches the file path
-                    //     printf("OOOOOOOOOOOOOOOOOOOOOOO++++++++++++++++Match found! %s\n", to_search);
-                    // }   else if (reti == REG_NOMATCH) {
-                    //     // if the regex pattern does not match the file path
-                    //     printf("No match found\n");
-                    // } else {
-                    //     // if there was an error executing the regex pattern
-                    //     fprintf(stderr, "Regex match failed\n");
-                    //     // exit(1);
-                    // }
-
-
                     if(strstr(to_search, search_for) != NULL || show_all) { // check if the content_path string is a substring of the file path
                         cJSON *file_object = cJSON_CreateObject(); // create a new JSON object for the file
-                        // printf("-=-=-=-=-=-=----((((*****************))))>file path: %s found\n", f->path); fflush(stdout);
-                        cJSON_AddStringToObject(file_object, "content", f->path); // add the file path to the object as "content"
+                        cJSON_AddStringToObject(file_object, "content", node->key); // add the file path to the object as "content"
                         cJSON *peers_array = cJSON_AddArrayToObject(file_object, "peers"); // add an empty array to the object as "peers"
                         if(f->peers != NULL) {
                             for(int j = 0; j < f->peers->size; j++) {
@@ -610,7 +589,6 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
                         cJSON_AddItemToArray(json, file_object); // add the file object to the main array
                     }
                     
-                    regfree(&regex);
                     node = node->next;
                 }
             // }

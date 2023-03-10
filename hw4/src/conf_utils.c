@@ -608,6 +608,7 @@ void update_peer_to_files_map(hash_table *local_files_map, hash_table *peers_ht_
                 char *file_path = node->key;
                 file_info *file_path_file_info = hash_table_get(local_files_map, file_path, strlen(file_path));
                 if (file_path_file_info != NULL && file_path_file_info->peers != NULL) {
+                    // uuid check for file_path_file_info->peers
                     bool isFound = hash_table_get(file_path_file_info->peers, peer_config->uuid, strlen(peer_config->uuid));
                     if (isFound == NULL) {
                         hash_table_put(file_path_file_info->peers, peer_config->uuid, true, strlen(peer_config->uuid));
@@ -626,9 +627,6 @@ void update_peer_to_files_map(hash_table *local_files_map, hash_table *peers_ht_
                     if (!isFound) {
                         hash_table_put(f->peers, peer_config->uuid, true, strlen(peer_config->uuid));
                     }
-                    fflush(stdout);
-                    // sprintf(f->path, "%s", file_path);
-
                     // file_path to local files map
                     char f_path[128];
                     strcpy(f_path, file_path);

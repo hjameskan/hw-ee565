@@ -518,13 +518,32 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
         printf("ack_packet before sent:\n");
         fflush(stdout);
         
+        // send file from local
         if(strcmp(global_config.uuid, found_peer->uuid) == 0){
             printf("found peer is self\n");
             fflush(stdout);
             // send_html_from_file(connect_fd, content_path);
             // return;
             // sleep(100000000);
+            // if the pathstr specifies actual content, further processing of the
+            // URI string is required
+            //printf("[INFO] filename: %s, filetype: %s\n", filename, filetype);
 
+            if (access(content_path, F_OK) == 0) {
+                // lookup the file's content type
+                char content_type[200];
+                char file_type[10];
+    
+                if (sscanf(content_path, "%*[^.]%s", file_type) == 1) {
+                    printf("File type: %s\n", file_type);
+                    int is_video_transfer = content_type_lookup(content_type, file_type);
+                } else {
+                    printf("No file type found.\n");
+                }
+
+                transfer_file_chunk(og_req_buffer, content_path, connect_fd, content_type);
+            }
+            return;
         }
 
 

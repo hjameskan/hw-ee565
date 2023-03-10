@@ -10,7 +10,7 @@
 
 # Instruction to Start HTTP Server #
 
-Go to the directory: `hw3`, execute:
+Go to the directory: `hw4`, execute:
 
 ```
 make clean && make && ./vodserver $(port1) $(port2)
@@ -22,7 +22,7 @@ You can see how to test the url requests [by clicking here](#http-server)
 <br /><br />
 
 # Code Architecture #
-![This is the architecture](design/architecture.png)
+![This is the architecture](design/Architecture2_2.png)
 <br/><br/>
 # TCP Peer Checker #
 
@@ -70,9 +70,27 @@ This path displays the entire network architecture with all metrics and all leve
 This path displays all the peers of the server but shows only the calculated fastest path based on the metric of each peer.
 <br/>
 <br/>
-⚠️
-Note that since the add-file-path feature from HW2 doesn't specify the "UUID" and "node name”, there is no way to map a file path to a node properly without altering the original specified format. This is because a server may have multiple names or UUID. A filter can be easily applied based on the "UUID" or "node name" if the file-path relationship is known. This information is missing for HW3; therefore, the shortest paths to all nodes are shown instead. ⚠️
 ![This is the rank response](design/rank.png)
+<br/><br/>
+
+```
+/peer/search/<search path>
+```
+This path allows for the display of all files within a specified subdirectory (e.g., images, videos, etc.) and presents all available content for viewing.
+<br/>
+<br/>
+
+![This is the search response](design/search.png)
+<br/><br/>
+
+```
+/peer/view/<content path>
+```
+This path allows for the display of the specific file  content that is requested based on the content path given in the peer_search method.
+<br/>
+<br/>
+
+![This is the rank response](design/view.png)
 <br/><br/>
 
 <br />

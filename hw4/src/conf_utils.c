@@ -630,7 +630,6 @@ void update_peer_to_files_map(hash_table *local_files_map, hash_table *peers_ht_
                     // file_path to local files map
                     char f_path[128];
                     strcpy(f_path, file_path);
-                    f_path[strlen(f_path) - 1] = '\0';
                     hash_table_put_str(local_files_map, f_path, f, strlen(f_path));
                     printf("strlen(f_path): %d , %d\n", strlen(f_path), sizeof(f->path)); fflush(stdout);
                     printf("strlen(f_path): %d , %d\n", strlen(f_path), sizeof(f->path)); fflush(stdout);

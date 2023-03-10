@@ -13,6 +13,7 @@
 #include "http_utils.h"
 #include "hashmap.h"
 #include "conf_utils.h"
+#include <regex.h>
 
 #define PACKET_DATA_SIZE 1024
 
@@ -130,6 +131,28 @@ void parse_http_uri(const char *path, char **filename, char **filetype)
 //     //printf("[INFO]: filename: %s, filetype: %s\n", *filename, *filetype);
 //     return struct file_info {filename, filetype};
 // }
+
+int searchSubstring(char *str, char *substr) {
+    int len1 = strlen(str);
+    int len2 = strlen(substr);
+    printf("len1: %s %d, len2: %s %d \n", str, len1, substr, len2);
+    if (len1 < len2) {
+        return -1;
+    }
+    
+    for (int i = 0; i <= len1 - len2; i++) {
+        int j;
+        for (j = 0; j < len2; j++) {
+            if (str[i+j] != substr[j]) {
+                break;
+            }
+        }
+        if (j == len2) {
+            return i;
+        }
+    }
+    return -1;
+}
 
 int content_type_lookup(char *content_type, char *filetype)
 {
@@ -527,9 +550,44 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
                 while(node != NULL) {
                     file_info *f = (file_info *) node->value;
                     printf("+++++++++++++++++++>>>>>>>>>>file path: %s\n", node->key);
-                    if(strstr(f->path, content_path) != NULL) { // check if the content_path string is a substring of the file path
+                    char to_search[128] = {0};
+                    strcpy(to_search, f->path);
+                    char search_for[128] = {0};
+                    strcpy(search_for, content_path);
+
+                    regex_t regex;
+                    int reti;
+                    char *pattern = search_for;
+                    // compile the regex pattern
+                    reti = regcomp(&regex, search_for, 0);
+                    if (reti) {
+                        fprintf(stderr, "Could not compile regex\n");
+                        exit(1);
+                    }
+
+                    if(searchSubstring(&to_search, &search_for) != -1){
                         cJSON *file_object = cJSON_CreateObject(); // create a new JSON object for the file
                         printf("-=-=-=-=-=-=----((((*****************))))>file path: %s found\n", f->path); fflush(stdout);
+                    }
+
+                    // execute the regex pattern on the file path
+                    // reti = regexec(&regex, to_search, 0, NULL, 0);
+                    // if (!reti) {
+                    //     // if the regex pattern matches the file path
+                    //     printf("OOOOOOOOOOOOOOOOOOOOOOO++++++++++++++++Match found! %s\n", to_search);
+                    // }   else if (reti == REG_NOMATCH) {
+                    //     // if the regex pattern does not match the file path
+                    //     printf("No match found\n");
+                    // } else {
+                    //     // if there was an error executing the regex pattern
+                    //     fprintf(stderr, "Regex match failed\n");
+                    //     // exit(1);
+                    // }
+
+
+                    if(strstr(to_search, search_for) != NULL) { // check if the content_path string is a substring of the file path
+                        cJSON *file_object = cJSON_CreateObject(); // create a new JSON object for the file
+                        // printf("-=-=-=-=-=-=----((((*****************))))>file path: %s found\n", f->path); fflush(stdout);
                         cJSON_AddStringToObject(file_object, "content", f->path); // add the file path to the object as "content"
                         cJSON *peers_array = cJSON_AddArrayToObject(file_object, "peers"); // add an empty array to the object as "peers"
                         if(f->peers != NULL) {
@@ -546,6 +604,8 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
                         }
                         cJSON_AddItemToArray(json, file_object); // add the file object to the main array
                     }
+                    
+                    regfree(&regex);
                     node = node->next;
                 }
             // }

@@ -620,13 +620,24 @@ void update_peer_to_files_map(hash_table *local_files_map, hash_table *peers_ht_
                     file_info *f = malloc(sizeof(file_info));
                     f->peers = hash_table_create(MAX_HASHTABLE_SIZE);
                     strcpy(f->path, peers_file_info->path);
+
+                    // uuid check for f->peers
                     bool isFound = hash_table_get(f->peers, peer_config->uuid, strlen(peer_config->uuid));
                     if (!isFound) {
                         hash_table_put(f->peers, peer_config->uuid, true, strlen(peer_config->uuid));
                     }
                     fflush(stdout);
                     // sprintf(f->path, "%s", file_path);
-                    hash_table_put_str(local_files_map, file_path, f, strlen(file_path));
+
+                    // file_path to local files map
+                    char f_path[128];
+                    strcpy(f_path, file_path);
+                    f_path[strlen(f_path) - 1] = '\0';
+                    hash_table_put_str(local_files_map, f_path, f, strlen(f_path));
+                    printf("strlen(f_path): %d , %d\n", strlen(f_path), sizeof(f->path)); fflush(stdout);
+                    printf("strlen(f_path): %d , %d\n", strlen(f_path), sizeof(f->path)); fflush(stdout);
+                    printf("strlen(f_path): %d , %d\n", strlen(f_path), sizeof(f->path)); fflush(stdout);
+                    printf("strlen(f_path): %d , %d\n", strlen(f_path), sizeof(f->path)); fflush(stdout);
                 }
                 node = node->next;
             }

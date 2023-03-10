@@ -534,12 +534,18 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
         printf("/peer/search parsed!\n");
         char *search_query;
 
-        char *content_path = strtok_r(NULL, "", &rest); // here is the content path
-
+        bool show_all = false;
+        char *content_path;
+        if(strcmp(rest, "") == 0){
+            printf("rest is empty\n"); fflush(stdout);
+            show_all = true;
+            content_path = "";
+        } else {
+             content_path= strtok_r(NULL, "", &rest); // here is the content path
+        }
         // ********************************
         // PERFORM /PEER/SEARCH work here
         // ********************************
-
         cJSON *json = cJSON_CreateArray(); // create the JSON array
         printf("/peer/search PRINTING HASH TABLE KEYS %d\n", ht_filepaths->size);
         print_keys(ht_filepaths);
@@ -562,10 +568,9 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
                     reti = regcomp(&regex, search_for, 0);
                     if (reti) {
                         fprintf(stderr, "Could not compile regex\n");
-                        exit(1);
                     }
 
-                    if(searchSubstring(&to_search, &search_for) != -1){
+                    if(searchSubstring(&to_search, &search_for) != -1) {
                         cJSON *file_object = cJSON_CreateObject(); // create a new JSON object for the file
                         printf("-=-=-=-=-=-=----((((*****************))))>file path: %s found\n", f->path); fflush(stdout);
                     }
@@ -585,7 +590,7 @@ void process_peer_path(char *path_string, int connect_fd, char *og_req_buffer)
                     // }
 
 
-                    if(strstr(to_search, search_for) != NULL) { // check if the content_path string is a substring of the file path
+                    if(strstr(to_search, search_for) != NULL || show_all) { // check if the content_path string is a substring of the file path
                         cJSON *file_object = cJSON_CreateObject(); // create a new JSON object for the file
                         // printf("-=-=-=-=-=-=----((((*****************))))>file path: %s found\n", f->path); fflush(stdout);
                         cJSON_AddStringToObject(file_object, "content", f->path); // add the file path to the object as "content"

@@ -1,4 +1,4 @@
-# GitHub README for EE 565: Computer Communication Networks (Winter 2023)
+# EE 565: Computer Communication Networks (Winter 2023)
 
 ## Overview
 
